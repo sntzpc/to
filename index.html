@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,8 +9,9 @@
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 </head>
+
 <body>
     <div class="judul">
         <h2>Identifikasi dan Verifikasi TO</h2>
@@ -97,12 +99,32 @@
         <button onclick="saveData()">Simpan Data</button>
         <button onclick="resetForm(true)" style="display: none;">Reset Form</button>
         <button onclick="resetCurrentBlock()" style="display: none;">Reset Blok Ini</button>
-        <button onclick="exportToExcel()" style="background-color: hsl(51, 95%, 45%);-webkit-text-fill-color: black;">Export ke Excel</button>
+        <button onclick="exportToExcel()"
+            style="background-color: hsl(51, 95%, 45%);-webkit-text-fill-color: black;">Export ke Excel</button>
 
         <div class="report">
             <p>Total Pokok: <span id="totalPokok">0</span> | No. Terakhir: <span id="lastPokok">-</span></p>
             <p class="timestamp" id="lastSaved">Terakhir disimpan: -</p>
         </div>
+        <!-- Geo-Visualisasi: MAP -->
+        <div id="map-section" style="margin-top:24px;">
+            <h4>Peta Tracking & Placemark</h4>
+            <div id="geo-map"
+                style="height:320px;width:100%;border-radius:8px;border:1px solid #aaa;margin-bottom:12px;"></div>
+        </div>
+        <!-- Tambahan: Upload Offline Map Image -->
+        <div class="section">
+            <h4>Tambahkan Peta Offline (PNG/JPG hasil Google Maps)</h4>
+            <input type="file" id="offlineMapInput" accept="image/png, image/jpeg">
+            <label for="offlineMapInput" style="font-size:12px;color:gray;">(Gambar harus hasil screenshot Google Maps,
+                georeference manual di bawah)</label>
+            <br>
+            <label>LatLng Kiri-Atas: <input type="text" id="offlineMapNW" value="-2.27,113.90" size="14"></label>
+            <label>LatLng Kanan-Bawah: <input type="text" id="offlineMapSE" value="-2.28,113.93" size="14"></label>
+            <button id="btnSetOfflineMap" type="button" style="background-color: hsl(51, 95%, 45%);color:black;">Terapkan Offline
+                Map</button>
+            <button id="btnRemoveOfflineMap" type="button" style="background-color: #f44336;color:#ffffff;">Hapus Offline Map</button>
+        </div> 
         <div id="storage-info-section" style="margin-top: 20px;">
             <div style="margin-bottom:6px;font-weight:bold;">Storage Usage</div>
             <div id="storage-bar-wrapper"
@@ -113,24 +135,6 @@
             </div>
             <div id="storage-info-text" style="margin-top:6px;font-size:14px;text-align:left;"></div>
         </div>
-        <!-- Geo-Visualisasi: MAP -->
-<div id="map-section" style="margin-top:24px;">
-  <h4>Peta Tracking & Placemark</h4>
-  <div id="geo-map" style="height:320px;width:100%;border-radius:8px;border:1px solid #aaa;margin-bottom:12px;"></div>
-  <div style="display:flex;gap:8px;align-items:center;">
-    <button id="btnAddPlacemark" class="btn btn-warning" type="button" style="color:black;">
-      Tambah Placemark
-    </button>
-    <input type="text" id="placemarkNote" placeholder="Keterangan placemark" style="width:200px;">
-    <select id="placemarkColor" style="width:90px;">
-      <option value="red" selected>Merah</option>
-      <option value="blue">Biru</option>
-      <option value="green">Hijau</option>
-      <option value="orange">Oranye</option>
-      <option value="purple">Ungu</option>
-    </select>
-  </div>
-</div>
     </div>
 
     <!-- Tab 2: Verifikasi -->
@@ -195,7 +199,7 @@
                     Belum: <span id="countUnverifiedVerif">0</span>
                 </p>
             </div>
-            
+
             <!-- Modal Belum Verifikasi -->
             <div style="margin-top: 10px;">
                 <button id="btnShowUnverified" onclick="showUnverifiedModal()"
@@ -334,7 +338,6 @@
         </div>
         <div class="report">
             <h4>History Tracking Sensus</h4>
-            <div class="responsive-table">
                 <table id="tracking-history-table" class="summary-table">
                     <thead>
                         <tr>
@@ -345,28 +348,33 @@
                             <th>Aksi</th>
                         </tr>
                     </thead>
-                    <tbody></tbody>
+                    <tbody>
+                        <!-- Data dari JS-->
+                    </tbody>
                 </table>
-            </div>
         </div>
         <!-- Daftar Placemark -->
-<div id="placemark-list-section" class="section">
-  <h4>Daftar Placemark</h4>
-  <button id="exportPlacemarkKML" class="btn btn-success" type="button">Export .KML</button>
-  <table id="placemarkTable" style="margin-top:10px;">
-    <thead>
-      <tr>
-        <th>No</th>
-        <th>Lat</th>
-        <th>Lng</th>
-        <th>Keterangan</th>
-        <th>Warna</th>
-        <th>Hapus</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-</div>
+         <div class="report">
+        <div id="placemark-list-section">
+            <h4>Daftar Placemark</h4>
+            <button id="exportPlacemarkKML" class="btn btn-success" type="button">Export .KML</button>
+            <table id="placemarkTable" style="margin-top:10px;">
+                <thead>
+                    <tr>
+                        <th>No</th>
+                        <th>Lat</th>
+                        <th>Lng</th>
+                        <th>Keterangan</th>
+                        <th>Warna</th>
+                        <th>Hapus</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Data dari JS-->
+                </tbody>
+            </table>
+        </div>
+        </div>
         <!-- Kontrol Pagination -->
         <div>
             <label for="pageSizeReport" style="margin-right: 8px;">Tampilkan:</label>
@@ -475,4 +483,5 @@
     </div>
 </body>
 <script src="app.js"></script>
+
 </html>

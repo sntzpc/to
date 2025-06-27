@@ -458,7 +458,9 @@ body.dark-mode #pokokBTable td[style*="background-color: #ffffcc"] {
     }
 }
 @media screen and (max-width: 1200px) {
-    #reportTable {
+    #reportTable,
+    #tracking-history-table,
+    #placemarkTable {
         display: block;
         overflow-x: auto;
         white-space: nowrap;
