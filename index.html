@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thinning Out</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+</head>
+<body>
+    <div class="judul">
+        <h2>Identifikasi dan Verifikasi TO</h2>
+        <h2>Kelapa Sawit</h2>
+    </div>
+
+    <div class="tab">
+        <button class="tablinks active" onclick="openTab(event, 'identifikasi')">Identifikasi</button>
+        <button class="tablinks" onclick="openTab(event, 'verifikasi')">Verifikasi</button>
+        <button class="tablinks" onclick="openTab(event, 'report')">Report</button>
+    </div>
+
+    <!-- Tab 1: Identifikasi Lapangan -->
+    <div id="identifikasi" class="tabcontent" style="display: block;">
+        <h3>Identifikasi Lapangan</h3>
+        <!-- Tracking -->
+        <div id="tracking-section">
+            <div class="d-flex justify-content-center gap-3 mb-3">
+                <button id="btnTrackStart" onclick="startTracking()" class="btn btn-success"
+                    style="width: 50px; height: 50px;" title="Mulai Recording">
+                    <i class="fas fa-circle"></i>
+                </button>
+                <button id="btnTrackPause" onclick="pauseTracking()" class="btn btn-warning"
+                    style="width: 50px; height: 50px;" title="Jeda" disabled>
+                    <i class="fas fa-pause"></i>
+                </button>
+                <button id="btnTrackStop" onclick="stopTracking()" class="btn btn-danger"
+                    style="width: 50px; height: 50px;" title="Stop" disabled>
+                    <i class="fas fa-stop"></i>
+                </button>
+            </div>
+            <div id="tracking-status" class="report"></div>
+        </div>
+        <div>
+            <label for="estate">Estate:</label>
+            <input type="text" id="estate" placeholder="Contoh: KHTE">
+
+            <label for="divisi">Divisi:</label>
+            <input type="number" id="divisi" placeholder="Contoh: 1">
+
+            <label for="blok">Blok:</label>
+            <input type="text" id="blok" placeholder="Contoh: G-12">
+
+            <label for="no_pokok">No. Pokok:</label>
+            <input type="text" id="no_pokok" placeholder="Contoh: 134 atau 4B">
+        </div>
+
+        <h4>Pengukuran Jarak (meter)</h4>
+        <table id="measurementTable">
+            <tr>
+                <th>Titik</th>
+                <th>Jarak (m)</th>
+            </tr>
+            <tr>
+                <td>P1</td>
+                <td><input type="number" step="0.1" class="jarak" onchange="checkDistance(this)"></td>
+            </tr>
+            <tr>
+                <td>P2</td>
+                <td><input type="number" step="0.1" class="jarak" onchange="checkDistance(this)"></td>
+            </tr>
+            <tr>
+                <td>P3</td>
+                <td><input type="number" step="0.1" class="jarak" onchange="checkDistance(this)"></td>
+            </tr>
+            <tr>
+                <td>P4</td>
+                <td><input type="number" step="0.1" class="jarak" onchange="checkDistance(this)"></td>
+            </tr>
+            <tr>
+                <td>P5</td>
+                <td><input type="number" step="0.1" class="jarak" onchange="checkDistance(this)"></td>
+            </tr>
+            <tr>
+                <td>P6</td>
+                <td><input type="number" step="0.1" class="jarak" onchange="checkDistance(this)"></td>
+            </tr>
+        </table>
+
+        <div>
+            <label for="keteranganPokok">Keterangan:</label>
+            <input type="text" id="keteranganPokok" placeholder="Keterangan untuk pokok ini">
+        </div>
+
+        <button onclick="saveData()">Simpan Data</button>
+        <button onclick="resetForm(true)" style="display: none;">Reset Form</button>
+        <button onclick="resetCurrentBlock()" style="display: none;">Reset Blok Ini</button>
+        <button onclick="exportToExcel()" style="background-color: hsl(51, 95%, 45%);-webkit-text-fill-color: black;">Export ke Excel</button>
+
+        <div class="report">
+            <p>Total Pokok: <span id="totalPokok">0</span> | No. Terakhir: <span id="lastPokok">-</span></p>
+            <p class="timestamp" id="lastSaved">Terakhir disimpan: -</p>
+        </div>
+        <div id="storage-info-section" style="margin-top: 20px;">
+            <div style="margin-bottom:6px;font-weight:bold;">Storage Usage</div>
+            <div id="storage-bar-wrapper"
+                style="width:100%;background:#eee;border-radius:8px;height:28px;overflow:hidden;">
+                <div id="storage-bar"
+                    style="height:100%;width:0%;background:#3498db;border-radius:8px 0 0 8px;transition:width 0.4s,background 0.4s;">
+                </div>
+            </div>
+            <div id="storage-info-text" style="margin-top:6px;font-size:14px;text-align:left;"></div>
+        </div>
+        <!-- Geo-Visualisasi: MAP -->
+<div id="map-section" style="margin-top:24px;">
+  <h4>Peta Tracking & Placemark</h4>
+  <div id="geo-map" style="height:320px;width:100%;border-radius:8px;border:1px solid #aaa;margin-bottom:12px;"></div>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <button id="btnAddPlacemark" class="btn btn-warning" type="button" style="color:black;">
+      Tambah Placemark
+    </button>
+    <input type="text" id="placemarkNote" placeholder="Keterangan placemark" style="width:200px;">
+    <select id="placemarkColor" style="width:90px;">
+      <option value="red" selected>Merah</option>
+      <option value="blue">Biru</option>
+      <option value="green">Hijau</option>
+      <option value="orange">Oranye</option>
+      <option value="purple">Ungu</option>
+    </select>
+  </div>
+</div>
+    </div>
+
+    <!-- Tab 2: Verifikasi -->
+    <div id="verifikasi" class="tabcontent">
+        <h3>Verifikasi TO</h3>
+        <div>
+            <label for="uploadExcel">Upload Data Identifikasi (Excel):</label>
+            <input type="file" id="uploadExcel" accept=".xlsx, .xls">
+            <button onclick="loadExcel()">Load Data</button>
+        </div>
+
+        <div>
+            <label for="searchPokok">Cari No. Pokok:</label>
+            <input type="text" id="searchPokok" placeholder="Masukkan nomor pokok (misal: 4 atau 4B)">
+            <button onclick="findPokok()">Cari</button>
+            <div id="askepResult" style="margin-top: 5px; font-weight: bold;"></div>
+        </div>
+
+        <div id="verificationData" style="display: none;">
+            <h4>Data Pokok</h4>
+            <table id="verificationTable">
+                <tr>
+                    <th>Titik</th>
+                    <th>Jarak (m)</th>
+                </tr>
+                <!-- Data dari JS -->
+            </table>
+
+            <div>
+                <label for="keteranganPokokVerifikasi">Keterangan:</label>
+                <input type="text" id="keteranganPokokVerifikasi" placeholder="Keterangan untuk pokok ini">
+            </div>
+
+            <div id="measurementSummary" style="margin-top: 10px;"></div>
+
+            <h4>Verifikasi</h4>
+            <label for="verifierLevel">Level Verifikasi:</label>
+            <select id="verifierLevel">
+                <option value="askep">Askep</option>
+                <option value="mgr">MGR</option>
+                <option value="rc">RC/VPA</option>
+            </select>
+
+            <label for="keputusan">Keputusan:</label>
+            <select id="keputusan">
+                <option value="Y">Y (Yes)</option>
+                <option value="N">N (No)</option>
+                <option value="AB">AB (Abnormal)</option>
+                <option value="TK">TK (Titik Kosong)</option>
+                <option value="NA">NA (Tidak ada di peta)</option>
+            </select>
+
+            <button onclick="saveVerification()">Simpan</button>
+            <button onclick="addNewPokok()">Tambah Pokok</button>
+            <p class="timestamp" id="lastVerified">Terakhir diverifikasi: -</p>
+            <!-- Progres Verifikasi -->
+            <div id="verifikasiSummary"
+                style="margin-top: 8px; background: #f9f9f9; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                <p style="margin: 0; font-weight: bold; color: black;">
+                    Total Pokok: <span id="totalPokokVerif">0</span> |
+                    Sudah: <span id="countVerifiedVerif">0</span> |
+                    Belum: <span id="countUnverifiedVerif">0</span>
+                </p>
+            </div>
+            
+            <!-- Modal Belum Verifikasi -->
+            <div style="margin-top: 10px;">
+                <button id="btnShowUnverified" onclick="showUnverifiedModal()"
+                    style="background-color: #2196F3; color: white;">
+                    Pokok Belum Verifikasi
+                </button>
+            </div>
+            <div id="unverifiedModal" style="display: none;
+     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+     background: rgba(0,0,0,0.5); z-index: 9999; overflow: auto;">
+                <div style="margin: 50px auto; padding: 20px;
+              border-radius: 5px; max-width: 95%; width: 900px;
+              position: relative; max-height: 80vh; overflow: auto;">
+                    <button onclick="closeUnverifiedModal()" style="position: absolute; top: 10px; right: 10px;
+                   background: #f44336; color: white; border: none;
+                   border-radius: 3px; padding: 4px 8px; cursor: pointer;">
+                        ✕ Tutup
+                    </button>
+
+                    <h3 style="margin-top: 0;">Pokok Belum Verifikasi (<span id="totalUnverifiedCount">0</span>
+                        pkk)</h3>
+
+                    <div style="margin-bottom: 10px; display: flex; align-items: center;">
+                        <label for="pageSizeUnverified" style="margin-right: 8px;">Tampilkan:</label>
+                        <select id="pageSizeUnverified" onchange="setupUnverifiedPagination()">
+                            <option value="20">20</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                            <option value="500">500</option>
+                            <option value="1000">1000</option>
+                        </select>
+
+                        <input type="text" id="searchUnverified" placeholder="Cari pokok..."
+                            oninput="setupUnverifiedPagination()"
+                            style="margin-left: 20px; padding: 4px 8px; width: 200px;" />
+                    </div>
+                    <div id="paginationUnverifiedControls" style="margin-bottom: 10px; text-align: center;"></div>
+
+                    <!-- Tabel Daftar Pokok Belum Verifikasi -->
+                    <div style="overflow-x: auto; white-space: nowrap; text-align: center">
+                        <table id="unverifiedTable" style="width:100%; font-size: 13px;">
+                            <thead>
+                                <tr>
+                                    <th style="text-align: center;">Estate</th>
+                                    <th style="text-align: center;">Div</th>
+                                    <th style="text-align: center;">Blok</th>
+                                    <th style="text-align: center;">No.Pkk</th>
+                                    <th style="text-align: center;">P1</th>
+                                    <th style="text-align: center;">P2</th>
+                                    <th style="text-align: center;">P3</th>
+                                    <th style="text-align: center;">P4</th>
+                                    <th style="text-align: center;">P5</th>
+                                    <th style="text-align: center;">P6</th>
+                                    <th style="text-align: center;">≤6.4m</th>
+                                    <th style="text-align: center;">Askep</th>
+                                    <th style="text-align: center;">MGR</th>
+                                    <th style="text-align: center;">RC/VPA</th>
+                                    <th>Note</th>
+                                    <th>Diubah</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Data dari JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <!-- Akhir Modal -->
+
+        </div>
+    </div>
+
+    <!-- Tab 3: Report -->
+    <div id="report" class="tabcontent">
+        <h3>Report Data</h3>
+        <div>
+            <label for="reportLevel">Level Verifikasi:</label>
+            <select id="reportLevel" onchange="generateReport()">
+                <option value="all">Semua Level</option>
+                <option value="askep">Askep</option>
+                <option value="mgr">MGR</option>
+                <option value="rc">RC/VPA</option>
+            </select>
+        </div>
+
+        <button onclick="generateReport()" style="background-color: #0b07ff; display: none;">Refresh</button>
+        <button onclick="exportAllToExcel()">Export All</button>
+        <button id="btnShowPokokB" onclick="showPokokBModal()"
+            style="background-color: #9c27b0; color: white;">Pindah</button>
+        <button onclick="confirmDelete()" style="background-color: #f44336;">Delete</button>
+        <button id="btnSyncGoogleSheet" onclick="syncToGoogleSheet()"
+            style="background-color: hsl(51, 95%, 45%); -webkit-text-fill-color: black;">Sync</button>
+        <span id="syncStatus" style="margin-left:5px"></span>
+
+        <div id="summaryReport" class="report">
+            <h4>Rekap Keputusan</h4>
+            <table>
+                <tr>
+                    <th>Keputusan</th>
+                    <th>Jumlah</th>
+                    <th>Persentase</th>
+                </tr>
+                <tr>
+                    <td>Y (Yes)</td>
+                    <td id="countY">0</td>
+                    <td id="percentY">0%</td>
+                </tr>
+                <tr>
+                    <td>N (No)</td>
+                    <td id="countN">0</td>
+                    <td id="percentN">0%</td>
+                </tr>
+                <tr>
+                    <td>AB (Abnormal)</td>
+                    <td id="countAB">0</td>
+                    <td id="percentAB">0%</td>
+                </tr>
+                <tr>
+                    <td>TK (Titik Kosong)</td>
+                    <td id="countTK">0</td>
+                    <td id="percentTK">0%</td>
+                </tr>
+                <tr>
+                    <td>NA (Tidak ada di Peta)</td>
+                    <td id="countNA">0</td>
+                    <td id="percentNA">0%</td>
+                </tr>
+                <tr>
+                    <td><strong>Total</strong></td>
+                    <td id="totalAll">0</td>
+                    <td>100%</td>
+                </tr>
+            </table>
+            <p class="timestamp" id="reportTimestamp">Terakhir diperbarui: -</p>
+        </div>
+        <div class="report">
+            <h4>History Tracking Sensus</h4>
+            <div class="responsive-table">
+                <table id="tracking-history-table" class="summary-table">
+                    <thead>
+                        <tr>
+                            <th>Tanggal</th>
+                            <th>Blok</th>
+                            <th>Durasi</th>
+                            <th>Jumlah Titik</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        <!-- Daftar Placemark -->
+<div id="placemark-list-section" class="section">
+  <h4>Daftar Placemark</h4>
+  <button id="exportPlacemarkKML" class="btn btn-success" type="button">Export .KML</button>
+  <table id="placemarkTable" style="margin-top:10px;">
+    <thead>
+      <tr>
+        <th>No</th>
+        <th>Lat</th>
+        <th>Lng</th>
+        <th>Keterangan</th>
+        <th>Warna</th>
+        <th>Hapus</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+        <!-- Kontrol Pagination -->
+        <div>
+            <label for="pageSizeReport" style="margin-right: 8px;">Tampilkan:</label>
+            <select id="pageSizeReport" onchange="setupReportPagination()">
+                <option value="20">20</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="500">500</option>
+                <option value="1000">1000</option>
+            </select>
+
+            <input type="text" id="searchReport" placeholder="Cari data..." oninput="setupReportPagination()" />
+        </div>
+
+        <div id="paginationReportControls">
+        </div>
+        <!-- Tabel Detail Report -->
+        <div id="detailReport">
+            <h4>Detail Data</h4>
+            <table id="reportTable">
+                <thead>
+                    <tr>
+                        <th>Estate</th>
+                        <th>Div</th>
+                        <th>Blok</th>
+                        <th>No.Pkk</th>
+                        <th>P1</th>
+                        <th>P2</th>
+                        <th>P3</th>
+                        <th>P4</th>
+                        <th>P5</th>
+                        <th>P6</th>
+                        <th>≤6.4m</th>
+                        <th>Askep</th>
+                        <th>MGR</th>
+                        <th>RC/VPA</th>
+                        <th>Note</th>
+                        <th>Diubah</th>
+                        <th>Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Data dari JS -->
+                </tbody>
+            </table>
+        </div>
+        <!-- Modal Pokok Pindahan -->
+        <div id="pokokBModal" style="display: none;
+     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+     background: rgba(0,0,0,0.5); z-index: 9999; overflow: auto;">
+            <div style="margin: 50px auto; padding: 20px;
+              border-radius: 5px; max-width: 95%; width: 900px;
+              position: relative; max-height: 80vh; overflow: auto;">
+                <button onclick="closePokokBModal()" style="position: absolute; top: 10px; right: 10px;
+                   background: #f44336; color: white; border: none;
+                   border-radius: 3px; padding: 4px 8px; cursor: pointer;">
+                    ✕ Tutup
+                </button>
+
+                <h3 style="margin-top: 0;">Jumlah Pokok Pindah (<span id="totalPokokBCount">0</span> pkk)
+                </h3>
+                <div style="margin-bottom: 10px; display: flex; align-items: center;">
+                    <label for="pageSizePokokB" style="margin-right: 8px;">Tampilkan:</label>
+                    <select id="pageSizePokokB" onchange="setupPokokBPagination()">
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                    </select>
+
+                    <input type="text" id="searchPokokB" placeholder="Cari pokok..." oninput="setupPokokBPagination()"
+                        style="margin-left: 20px; padding: 4px 8px; width: 200px;" />
+                </div>
+
+                <!-- Kontrol pagination -->
+                <div id="paginationPokokBControls" style="margin-bottom: 10px; text-align: center;"></div>
+
+                <!-- Tabel Perbandingan Pokok Pindahan -->
+                <div style="overflow-x: auto; white-space: nowrap; text-align: center">
+                    <table id="pokokBTable" style="width:100%; font-size: 13px;">
+                        <thead>
+                            <tr>
+                                <th rowspan="2" style="text-align: center;">Blok</th>
+                                <th rowspan="2" style="text-align: center;">No.Pkk</th>
+                                <th colspan="3" style="text-align: center;">Pokok B</th>
+                                <th colspan="3" style="text-align: center;">Pokok Tanpa B</th>
+                                <th rowspan="2" style="text-align: center;">Status</th>
+                            </tr>
+                            <tr>
+                                <!-- Sub-header untuk Pokok Pindahan -->
+                                <th style="text-align: center;">Askep</th>
+                                <th style="text-align: center;">MGR</th>
+                                <th style="text-align: center;">RC/VPA</th>
+                                <!-- Sub-header untuk Pokok Asli -->
+                                <th style="text-align: center;">Askep</th>
+                                <th style="text-align: center;">MGR</th>
+                                <th style="text-align: center;">RC/VPA</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Data dari JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+<script src="app.js"></script>
+</html>

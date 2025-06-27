@@ -1,0 +1,2628 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thinning Out</title>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 10px;
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+
+        .section {
+            margin-bottom: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .judul h2 {
+            margin: 2px;
+            padding: 5px;
+            line-height: 1;
+            display: block;
+            text-align: center;
+        }
+
+        label {
+            font-size: 14px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .red-bg {
+            background-color: #ffcccc;
+        }
+
+        .report {
+            background-color: #f9f9f9;
+            padding: 10px;
+            margin-top: 10px;
+        }
+
+        .tab {
+            overflow: hidden;
+            border: 1px solid #ccc;
+            background-color: #f1f1f1;
+            border-radius: 5px 5px 0 0;
+        }
+
+        .tab button {
+            background-color: inherit;
+            float: left;
+            border: none;
+            outline: none;
+            cursor: pointer;
+            padding: 10px 16px;
+            transition: 0.3s;
+            color: black;
+        }
+
+        .tab button:hover {
+            background-color: #ddd;
+        }
+
+        .tab button.active {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .tabcontent {
+            display: none;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-top: none;
+            border-radius: 0 0 5px 5px;
+        }
+
+        .timestamp {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .yellow-bg {
+            background-color: #ffff99;
+        }
+
+        .blue-bg {
+            background-color: #99ccff;
+        }
+
+        #unverifiedTable td:not(:nth-child(15)) {
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        #unverifiedTable td:nth-child(15) {
+            text-align: left;
+            white-space: nowrap;
+            word-break: break-word;
+            max-width: 200px;
+        }
+
+        #unverifiedTable td[class*="-bg"] {
+            text-align: center !important;
+        }
+
+        #reportTable td:nth-child(2),
+        #reportTable td:nth-child(4),
+        #reportTable td:nth-child(5),
+        #reportTable td:nth-child(6),
+        #reportTable td:nth-child(7),
+        #reportTable td:nth-child(8),
+        #reportTable td:nth-child(9),
+        #reportTable td:nth-child(10),
+        #reportTable td:nth-child(11),
+        #reportTable td:nth-child(12),
+        #reportTable td:nth-child(13),
+        #reportTable td:nth-child(14) {
+            text-align: center;
+        }
+
+
+        #unverifiedModal>div,
+        #pokokBModal>div {
+            background: white;
+            margin: 50px auto;
+            padding: 20px;
+            border-radius: 5px;
+            max-width: 95%;
+            width: 900px;
+            position: relative;
+            max-height: 80vh;
+            overflow: auto;
+            border: 1px solid #ccc;
+        }
+
+        #unverifiedTable th,
+        #pokokBTable th {
+            background-color: #f2f2f2;
+        }
+
+        #unverifiedTable td,
+        #pokokBTable td {
+            border: 1px solid #ddd;
+        }
+
+
+        /* Dark mode */
+        body.dark-mode {
+            background-color: #121212;
+            color: #e0e0e0;
+        }
+
+        body.dark-mode .section {
+            border-color: #444;
+            background-color: #1e1e1e;
+        }
+
+        body.dark-mode .tab {
+            background-color: #333;
+            border-color: #444;
+        }
+
+        body.dark-mode .tab button {
+            color: #e0e0e0;
+            background-color: #333;
+        }
+
+        body.dark-mode .tab button:hover {
+            background-color: #555;
+        }
+
+        body.dark-mode .tab button.active {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        body.dark-mode .tabcontent {
+            border-color: #444;
+            background-color: #1e1e1e;
+        }
+
+        body.dark-mode table {
+            color: #e0e0e0;
+        }
+
+        body.dark-mode th {
+            background-color: #333;
+            color: #e0e0e0;
+        }
+
+        body.dark-mode td {
+            border-color: #444;
+        }
+
+        body.dark-mode input[type="text"],
+        body.dark-mode input[type="number"],
+        body.dark-mode select {
+            background-color: #333;
+            color: #e0e0e0;
+            border-color: #555;
+        }
+
+        body.dark-mode .report {
+            background-color: #252525;
+        }
+
+        body.dark-mode .timestamp {
+            color: #aaa;
+        }
+
+        body.dark-mode #verifikasiSummary {
+            background-color: #252525;
+            border-color: #444;
+        }
+
+        body.dark-mode #unverifiedModal>div {
+            background-color: #1e1e1e;
+            color: #e0e0e0;
+            border-color: #444;
+        }
+
+        body.dark-mode #unverifiedModal th {
+            background-color: #333;
+            color: #e0e0e0;
+            border-color: #444;
+        }
+
+        body.dark-mode #unverifiedModal td {
+            border-color: #444;
+            color: #e0e0e0;
+        }
+
+        body.dark-mode #unverifiedModal input,
+        body.dark-mode #unverifiedModal select,
+        body.dark-mode #pokokBModal input,
+        body.dark-mode #pokokBModal select {
+            background-color: #333;
+            color: #e0e0e0;
+            border-color: #555;
+        }
+
+        body.dark-mode .red-bg,
+        body.dark-mode .yellow-bg,
+        body.dark-mode .blue-bg {
+            color: black !important;
+        }
+
+        #darkModeToggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 999;
+            background-color: #333;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            font-size: 20px;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        body.dark-mode #darkModeToggle {
+            background-color: #e0e0e0;
+            color: #333;
+        }
+
+        body.dark-mode #pokokBModal>div {
+            background-color: #1e1e1e;
+            color: #e0e0e0;
+            border-color: #444;
+        }
+
+        body.dark-mode #pokokBModal th {
+            background-color: #333;
+            color: #e0e0e0;
+            border-color: #444;
+        }
+
+        body.dark-mode #pokokBModal td {
+            border-color: #444;
+            color: #e0e0e0;
+        }
+
+
+        body.dark-mode #pokokBTable td[style*="background-color: #ffcccc"] {
+            background-color: #990000 !important;
+            color: #ffffff !important;
+        }
+
+        body.dark-mode #pokokBTable td[style*="background-color: #ffffcc"] {
+            background-color: #999900 !important;
+            color: #ffffff !important;
+        }
+
+        /* Tracking */
+        #tracking-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            margin-bottom: 16px;
+        }
+
+        #tracking-section .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            border-width: 2px;
+        }
+
+        #tracking-section .btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        #tracking-section .btn:active {
+            transform: scale(0.95);
+        }
+
+        #tracking-section .btn-success {
+            background-color: #28a745;
+            border-color: #1e7e34;
+        }
+
+        #tracking-section .btn-warning {
+            background-color: #ffc107;
+            border-color: #d39e00;
+            color: #212529;
+        }
+
+        #tracking-section .btn-danger {
+            background-color: #dc3545;
+            border-color: #bd2130;
+        }
+
+        #tracking-section .btn:disabled {
+            opacity: 0.65;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+
+        #tracking-section i {
+            font-size: 1.1rem;
+        }
+
+        #tracking-status {
+            font-size: 0.85rem;
+            padding: 8px;
+            border-radius: 6px;
+            margin-top: 12px;
+        }
+
+        #tracking-history-table td,
+        #tracking-history-table th {
+            white-space: nowrap;
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        #tracking-history-table .aksi-btn {
+            padding: 4px 10px;
+            margin: 2px 2px;
+            border-radius: 3px;
+            border: none;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        #tracking-history-table .btn-export {
+            background: #2196f3;
+            color: #fff;
+        }
+
+        #tracking-history-table .btn-export:hover {
+            background: #1565c0;
+        }
+
+        #tracking-history-table .btn-delete {
+            background: #e53935;
+            color: #fff;
+        }
+
+        #tracking-history-table .btn-delete:hover {
+            background: #b71c1c;
+        }
+
+        #reportTable th,
+        #reportTable td {
+            padding: 6px;
+            font-size: 13px;
+        }
+
+        #reportTable button {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+
+        /* Versi Mobile */
+        @media screen and (max-width: 600px) {
+            table {
+                font-size: 12px;
+            }
+
+            th,
+            td {
+                padding: 5px;
+            }
+        }
+
+        @media screen and (max-width: 1200px) {
+            #reportTable {
+                display: block;
+                overflow-x: auto;
+                white-space: nowrap;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="judul">
+        <h2>Identifikasi dan Verifikasi TO</h2>
+        <h2>Kelapa Sawit</h2>
+    </div>
+
+    <div class="tab">
+        <button class="tablinks active" onclick="openTab(event, 'identifikasi')">Identifikasi</button>
+        <button class="tablinks" onclick="openTab(event, 'verifikasi')">Verifikasi</button>
+        <button class="tablinks" onclick="openTab(event, 'report')">Report</button>
+    </div>
+
+    <!-- Tab 1: Identifikasi Lapangan -->
+    <div id="identifikasi" class="tabcontent" style="display: block;">
+        <h3>Identifikasi Lapangan</h3>
+        <!-- Tracking -->
+        <div id="tracking-section">
+            <div class="d-flex justify-content-center gap-3 mb-3">
+                <button id="btnTrackStart" onclick="startTracking()" class="btn btn-success"
+                    style="width: 50px; height: 50px;" title="Mulai Recording">
+                    <i class="fas fa-circle"></i>
+                </button>
+                <button id="btnTrackPause" onclick="pauseTracking()" class="btn btn-warning"
+                    style="width: 50px; height: 50px;" title="Jeda" disabled>
+                    <i class="fas fa-pause"></i>
+                </button>
+                <button id="btnTrackStop" onclick="stopTracking()" class="btn btn-danger"
+                    style="width: 50px; height: 50px;" title="Stop" disabled>
+                    <i class="fas fa-stop"></i>
+                </button>
+            </div>
+            <div id="tracking-status" class="report"></div>
+        </div>
+        <div>
+            <label for="estate">Estate:</label>
+            <input type="text" id="estate" placeholder="Contoh: KHTE">
+
+            <label for="divisi">Divisi:</label>
+            <input type="number" id="divisi" placeholder="Contoh: 1">
+
+            <label for="blok">Blok:</label>
+            <input type="text" id="blok" placeholder="Contoh: G-12">
+
+            <label for="no_pokok">No. Pokok:</label>
+            <input type="text" id="no_pokok" placeholder="Contoh: 134 atau 4B">
+        </div>
+
+        <h4>Pengukuran Jarak (meter)</h4>
+        <table id="measurementTable">
+            <tr>
+                <th>Titik</th>
+                <th>Jarak (m)</th>
+            </tr>
+            <tr>
+                <td>P1</td>
+                <td><input type="number" step="0.1" class="jarak" onchange="checkDistance(this)"></td>
+            </tr>
+            <tr>
+                <td>P2</td>
+                <td><input type="number" step="0.1" class="jarak" onchange="checkDistance(this)"></td>
+            </tr>
+            <tr>
+                <td>P3</td>
+                <td><input type="number" step="0.1" class="jarak" onchange="checkDistance(this)"></td>
+            </tr>
+            <tr>
+                <td>P4</td>
+                <td><input type="number" step="0.1" class="jarak" onchange="checkDistance(this)"></td>
+            </tr>
+            <tr>
+                <td>P5</td>
+                <td><input type="number" step="0.1" class="jarak" onchange="checkDistance(this)"></td>
+            </tr>
+            <tr>
+                <td>P6</td>
+                <td><input type="number" step="0.1" class="jarak" onchange="checkDistance(this)"></td>
+            </tr>
+        </table>
+
+        <div>
+            <label for="keteranganPokok">Keterangan:</label>
+            <input type="text" id="keteranganPokok" placeholder="Keterangan untuk pokok ini">
+        </div>
+
+        <button onclick="saveData()">Simpan Data</button>
+        <button onclick="resetForm(true)" style="display: none;">Reset Form</button>
+        <button onclick="resetCurrentBlock()" style="display: none;">Reset Blok Ini</button>
+        <button onclick="exportToExcel()"
+            style="background-color: hsl(51, 95%, 45%);-webkit-text-fill-color: black;">Export ke Excel</button>
+
+        <div class="report">
+            <p>Total Pokok: <span id="totalPokok">0</span> | No. Terakhir: <span id="lastPokok">-</span></p>
+            <p class="timestamp" id="lastSaved">Terakhir disimpan: -</p>
+        </div>
+        <div id="storage-info-section" style="margin-top: 20px;">
+            <div style="margin-bottom:6px;font-weight:bold;">Storage Usage</div>
+            <div id="storage-bar-wrapper"
+                style="width:100%;background:#eee;border-radius:8px;height:28px;overflow:hidden;">
+                <div id="storage-bar"
+                    style="height:100%;width:0%;background:#3498db;border-radius:8px 0 0 8px;transition:width 0.4s,background 0.4s;">
+                </div>
+            </div>
+            <div id="storage-info-text" style="margin-top:6px;font-size:14px;text-align:left;"></div>
+        </div>
+    </div>
+
+    <!-- Tab 2: Verifikasi -->
+    <div id="verifikasi" class="tabcontent">
+        <h3>Verifikasi TO</h3>
+        <div>
+            <label for="uploadExcel">Upload Data Identifikasi (Excel):</label>
+            <input type="file" id="uploadExcel" accept=".xlsx, .xls">
+            <button onclick="loadExcel()">Load Data</button>
+        </div>
+
+        <div>
+            <label for="searchPokok">Cari No. Pokok:</label>
+            <input type="text" id="searchPokok" placeholder="Masukkan nomor pokok (misal: 4 atau 4B)">
+            <button onclick="findPokok()">Cari</button>
+            <div id="askepResult" style="margin-top: 5px; font-weight: bold;"></div>
+        </div>
+
+        <div id="verificationData" style="display: none;">
+            <h4>Data Pokok</h4>
+            <table id="verificationTable">
+                <tr>
+                    <th>Titik</th>
+                    <th>Jarak (m)</th>
+                </tr>
+                <!-- Data dari JS -->
+            </table>
+
+            <div>
+                <label for="keteranganPokokVerifikasi">Keterangan:</label>
+                <input type="text" id="keteranganPokokVerifikasi" placeholder="Keterangan untuk pokok ini">
+            </div>
+
+            <div id="measurementSummary" style="margin-top: 10px;"></div>
+
+            <h4>Verifikasi</h4>
+            <label for="verifierLevel">Level Verifikasi:</label>
+            <select id="verifierLevel">
+                <option value="askep">Askep</option>
+                <option value="mgr">MGR</option>
+                <option value="rc">RC/VPA</option>
+            </select>
+
+            <label for="keputusan">Keputusan:</label>
+            <select id="keputusan">
+                <option value="Y">Y (Yes)</option>
+                <option value="N">N (No)</option>
+                <option value="AB">AB (Abnormal)</option>
+                <option value="TK">TK (Titik Kosong)</option>
+                <option value="NA">NA (Tidak ada di peta)</option>
+            </select>
+
+            <button onclick="saveVerification()">Simpan</button>
+            <button onclick="addNewPokok()">Tambah Pokok</button>
+            <p class="timestamp" id="lastVerified">Terakhir diverifikasi: -</p>
+            <!-- Progres Verifikasi -->
+            <div id="verifikasiSummary"
+                style="margin-top: 8px; background: #f9f9f9; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                <p style="margin: 0; font-weight: bold; color: black;">
+                    Total Pokok: <span id="totalPokokVerif">0</span> |
+                    Sudah: <span id="countVerifiedVerif">0</span> |
+                    Belum: <span id="countUnverifiedVerif">0</span>
+                </p>
+            </div>
+
+            <!-- Modal Belum Verifikasi -->
+            <div style="margin-top: 10px;">
+                <button id="btnShowUnverified" onclick="showUnverifiedModal()"
+                    style="background-color: #2196F3; color: white;">
+                    Pokok Belum Verifikasi
+                </button>
+            </div>
+            <div id="unverifiedModal" style="display: none;
+     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+     background: rgba(0,0,0,0.5); z-index: 9999; overflow: auto;">
+                <div style="margin: 50px auto; padding: 20px;
+              border-radius: 5px; max-width: 95%; width: 900px;
+              position: relative; max-height: 80vh; overflow: auto;">
+                    <button onclick="closeUnverifiedModal()" style="position: absolute; top: 10px; right: 10px;
+                   background: #f44336; color: white; border: none;
+                   border-radius: 3px; padding: 4px 8px; cursor: pointer;">
+                        ✕ Tutup
+                    </button>
+
+                    <h3 style="margin-top: 0;">Pokok Belum Verifikasi (<span id="totalUnverifiedCount">0</span>
+                        pkk)</h3>
+
+                    <div style="margin-bottom: 10px; display: flex; align-items: center;">
+                        <label for="pageSizeUnverified" style="margin-right: 8px;">Tampilkan:</label>
+                        <select id="pageSizeUnverified" onchange="setupUnverifiedPagination()">
+                            <option value="20">20</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                            <option value="500">500</option>
+                            <option value="1000">1000</option>
+                        </select>
+
+                        <input type="text" id="searchUnverified" placeholder="Cari pokok..."
+                            oninput="setupUnverifiedPagination()"
+                            style="margin-left: 20px; padding: 4px 8px; width: 200px;" />
+                    </div>
+                    <div id="paginationUnverifiedControls" style="margin-bottom: 10px; text-align: center;"></div>
+
+                    <!-- Tabel Daftar Pokok Belum Verifikasi -->
+                    <div style="overflow-x: auto; white-space: nowrap; text-align: center">
+                        <table id="unverifiedTable" style="width:100%; font-size: 13px;">
+                            <thead>
+                                <tr>
+                                    <th style="text-align: center;">Estate</th>
+                                    <th style="text-align: center;">Div</th>
+                                    <th style="text-align: center;">Blok</th>
+                                    <th style="text-align: center;">No.Pkk</th>
+                                    <th style="text-align: center;">P1</th>
+                                    <th style="text-align: center;">P2</th>
+                                    <th style="text-align: center;">P3</th>
+                                    <th style="text-align: center;">P4</th>
+                                    <th style="text-align: center;">P5</th>
+                                    <th style="text-align: center;">P6</th>
+                                    <th style="text-align: center;">≤6.4m</th>
+                                    <th style="text-align: center;">Askep</th>
+                                    <th style="text-align: center;">MGR</th>
+                                    <th style="text-align: center;">RC/VPA</th>
+                                    <th>Note</th>
+                                    <th>Diubah</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Data dari JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <!-- Akhir Modal -->
+
+        </div>
+    </div>
+
+    <!-- Tab 3: Report -->
+    <div id="report" class="tabcontent">
+        <h3>Report Data</h3>
+        <div>
+            <label for="reportLevel">Level Verifikasi:</label>
+            <select id="reportLevel" onchange="generateReport()">
+                <option value="all">Semua Level</option>
+                <option value="askep">Askep</option>
+                <option value="mgr">MGR</option>
+                <option value="rc">RC/VPA</option>
+            </select>
+        </div>
+
+        <button onclick="generateReport()" style="background-color: #0b07ff; display: none;">Refresh</button>
+        <button onclick="exportAllToExcel()">Export All</button>
+        <button id="btnShowPokokB" onclick="showPokokBModal()"
+            style="background-color: #9c27b0; color: white;">Pindah</button>
+        <button onclick="confirmDelete()" style="background-color: #f44336;">Delete</button>
+        <button id="btnSyncGoogleSheet" onclick="syncToGoogleSheet()"
+            style="background-color: hsl(51, 95%, 45%); -webkit-text-fill-color: black;">Sync</button>
+        <span id="syncStatus" style="margin-left:5px"></span>
+
+        <div id="summaryReport" class="report">
+            <h4>Rekap Keputusan</h4>
+            <table>
+                <tr>
+                    <th>Keputusan</th>
+                    <th>Jumlah</th>
+                    <th>Persentase</th>
+                </tr>
+                <tr>
+                    <td>Y (Yes)</td>
+                    <td id="countY">0</td>
+                    <td id="percentY">0%</td>
+                </tr>
+                <tr>
+                    <td>N (No)</td>
+                    <td id="countN">0</td>
+                    <td id="percentN">0%</td>
+                </tr>
+                <tr>
+                    <td>AB (Abnormal)</td>
+                    <td id="countAB">0</td>
+                    <td id="percentAB">0%</td>
+                </tr>
+                <tr>
+                    <td>TK (Titik Kosong)</td>
+                    <td id="countTK">0</td>
+                    <td id="percentTK">0%</td>
+                </tr>
+                <tr>
+                    <td>NA (Tidak ada di Peta)</td>
+                    <td id="countNA">0</td>
+                    <td id="percentNA">0%</td>
+                </tr>
+                <tr>
+                    <td><strong>Total</strong></td>
+                    <td id="totalAll">0</td>
+                    <td>100%</td>
+                </tr>
+            </table>
+            <p class="timestamp" id="reportTimestamp">Terakhir diperbarui: -</p>
+        </div>
+        <div class="report">
+            <h4>History Tracking Sensus</h4>
+            <div class="responsive-table">
+                <table id="tracking-history-table" class="summary-table">
+                    <thead>
+                        <tr>
+                            <th>Tanggal</th>
+                            <th>Blok</th>
+                            <th>Durasi</th>
+                            <th>Jumlah Titik</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        <!-- Kontrol Pagination -->
+        <div>
+            <label for="pageSizeReport" style="margin-right: 8px;">Tampilkan:</label>
+            <select id="pageSizeReport" onchange="setupReportPagination()">
+                <option value="20">20</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="500">500</option>
+                <option value="1000">1000</option>
+            </select>
+
+            <input type="text" id="searchReport" placeholder="Cari data..." oninput="setupReportPagination()" />
+        </div>
+
+        <div id="paginationReportControls">
+        </div>
+        <!-- Tabel Detail Report -->
+        <div id="detailReport">
+            <h4>Detail Data</h4>
+            <table id="reportTable">
+                <thead>
+                    <tr>
+                        <th>Estate</th>
+                        <th>Div</th>
+                        <th>Blok</th>
+                        <th>No.Pkk</th>
+                        <th>P1</th>
+                        <th>P2</th>
+                        <th>P3</th>
+                        <th>P4</th>
+                        <th>P5</th>
+                        <th>P6</th>
+                        <th>≤6.4m</th>
+                        <th>Askep</th>
+                        <th>MGR</th>
+                        <th>RC/VPA</th>
+                        <th>Note</th>
+                        <th>Diubah</th>
+                        <th>Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Data dari JS -->
+                </tbody>
+            </table>
+        </div>
+        <!-- Modal Pokok Pindahan -->
+        <div id="pokokBModal" style="display: none;
+     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+     background: rgba(0,0,0,0.5); z-index: 9999; overflow: auto;">
+            <div style="margin: 50px auto; padding: 20px;
+              border-radius: 5px; max-width: 95%; width: 900px;
+              position: relative; max-height: 80vh; overflow: auto;">
+                <button onclick="closePokokBModal()" style="position: absolute; top: 10px; right: 10px;
+                   background: #f44336; color: white; border: none;
+                   border-radius: 3px; padding: 4px 8px; cursor: pointer;">
+                    ✕ Tutup
+                </button>
+
+                <h3 style="margin-top: 0;">Jumlah Pokok Pindah (<span id="totalPokokBCount">0</span> pkk)
+                </h3>
+                <div style="margin-bottom: 10px; display: flex; align-items: center;">
+                    <label for="pageSizePokokB" style="margin-right: 8px;">Tampilkan:</label>
+                    <select id="pageSizePokokB" onchange="setupPokokBPagination()">
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                    </select>
+
+                    <input type="text" id="searchPokokB" placeholder="Cari pokok..." oninput="setupPokokBPagination()"
+                        style="margin-left: 20px; padding: 4px 8px; width: 200px;" />
+                </div>
+
+                <!-- Kontrol pagination -->
+                <div id="paginationPokokBControls" style="margin-bottom: 10px; text-align: center;"></div>
+
+                <!-- Tabel Perbandingan Pokok Pindahan -->
+                <div style="overflow-x: auto; white-space: nowrap; text-align: center">
+                    <table id="pokokBTable" style="width:100%; font-size: 13px;">
+                        <thead>
+                            <tr>
+                                <th rowspan="2" style="text-align: center;">Blok</th>
+                                <th rowspan="2" style="text-align: center;">No.Pkk</th>
+                                <th colspan="3" style="text-align: center;">Pokok B</th>
+                                <th colspan="3" style="text-align: center;">Pokok Tanpa B</th>
+                                <th rowspan="2" style="text-align: center;">Status</th>
+                            </tr>
+                            <tr>
+                                <!-- Sub-header untuk Pokok Pindahan -->
+                                <th style="text-align: center;">Askep</th>
+                                <th style="text-align: center;">MGR</th>
+                                <th style="text-align: center;">RC/VPA</th>
+                                <!-- Sub-header untuk Pokok Asli -->
+                                <th style="text-align: center;">Askep</th>
+                                <th style="text-align: center;">MGR</th>
+                                <th style="text-align: center;">RC/VPA</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Data dari JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+<script>
+    function openTab(evt, tabName) {
+        var tabcontent = document.getElementsByClassName("tabcontent");
+        for (var i = 0; i < tabcontent.length; i++) {
+            tabcontent[i].style.display = "none";
+        }
+
+        var tablinks = document.getElementsByClassName("tablinks");
+        for (var i = 0; i < tablinks.length; i++) {
+            tablinks[i].className = tablinks[i].className.replace(" active", "");
+        }
+
+        document.getElementById(tabName).style.display = "block";
+        evt.currentTarget.className += " active";
+    }
+
+    // Variabel Global
+    let allData = {};
+    let currentKey = "";
+    let currentPokok = null;
+    let lastActivity = {
+        saved: null,
+        verified: null,
+        reported: null
+    };
+    let reportData = [];
+
+    // Fungsi mengedit data pokok
+    function editPokokData(key, noPokok) {
+        const pokokIndex = allData[key].findIndex(item => item.no_pokok == noPokok);
+        if (pokokIndex === -1) {
+            alert("Data pokok tidak ditemukan!");
+            return;
+        }
+
+        const pokokData = allData[key][pokokIndex];
+
+        document.getElementById("identifikasi").style.display = "block";
+        document.getElementById("verifikasi").style.display = "none";
+        document.getElementById("report").style.display = "none";
+
+        const tablinks = document.getElementsByClassName("tablinks");
+        for (let i = 0; i < tablinks.length; i++) {
+            tablinks[i].className = tablinks[i].className.replace(" active", "");
+        }
+        document.querySelector('.tab button:nth-child(1)').className += " active";
+
+        const [estate, divisi, blok] = key.split("_");
+        document.getElementById("estate").value = estate;
+        document.getElementById("divisi").value = divisi;
+        document.getElementById("blok").value = blok;
+        document.getElementById("no_pokok").value = pokokData.no_pokok;
+        document.getElementById("keteranganPokok").value = pokokData.keterangan || "";
+
+        // menandai pokok yang ≤6.4m
+        for (let i = 1; i <= 6; i++) {
+            const input = document.querySelector(`#measurementTable tr:nth-child(${i+1}) .jarak`);
+            input.value = pokokData[`p${i}`] || "";
+            checkDistance(input);
+        }
+        currentKey = key;
+        window.scrollTo(0, 0);
+    }
+
+    // Fungsi menghapus data pokok
+    function deletePokokData(key, noPokok) {
+        if (!confirm(`Apakah Anda yakin ingin menghapus data No. Pokok ${noPokok}?`)) {
+            return;
+        }
+
+        const pokokIndex = allData[key].findIndex(item => item.no_pokok == noPokok);
+        if (pokokIndex === -1) {
+            alert("Data pokok tidak ditemukan!");
+            return;
+        }
+
+        allData[key].splice(pokokIndex, 1);
+
+        if (allData[key].length === 0) {
+            delete allData[key];
+        }
+
+        saveToLocalStorage();
+        updateReport();
+        alert(`Data No. Pokok ${noPokok} telah dihapus!`);
+    }
+
+    function updateHighlightedTextColor() {
+        const isDarkMode = document.body.classList.contains('dark-mode');
+        const highlightedCells = document.querySelectorAll('.red-bg, .yellow-bg, .blue-bg');
+
+        highlightedCells.forEach(cell => {
+            if (isDarkMode) {
+                cell.style.color = 'black';
+            } else {
+                cell.style.color = '';
+            }
+        });
+    }
+
+    // Inisiasi muat halaman
+    window.onload = function () {
+        document.getElementsByClassName("tablinks")[0].click();
+
+        loadFromLocalStorage();
+        updateReport();
+
+        const elVerifierLevel = document.getElementById('verifierLevel');
+        elVerifierLevel.addEventListener('change', updateVerifikasiSummary);
+
+        updateVerifikasiSummary();
+        updateHighlightedTextColor();
+    };
+
+    // Check distance and mark if <= 6.4m and not 0
+    function checkDistance(input) {
+        const value = parseFloat(input.value);
+        if (value > 0 && value <= 6.4) {
+            input.parentElement.classList.add("red-bg");
+        } else {
+            input.parentElement.classList.remove("red-bg");
+        }
+    }
+
+    // Simpan data identifikasi
+    function saveData() {
+        const estate = document.getElementById("estate").value.trim();
+        const divisi = document.getElementById("divisi").value.trim();
+        const blok = document.getElementById("blok").value.trim();
+        const noPokok = document.getElementById("no_pokok").value.trim();
+
+        if (!estate || !divisi || !blok || !noPokok) {
+            alert("Harap isi semua field identifikasi!");
+            return;
+        }
+        const key = `${estate}_${divisi}_${blok}`;
+        currentKey = key;
+
+        if (!allData[key]) {
+            allData[key] = [];
+        }
+
+        // Cari pokok yang sudah ada
+        const existingIndex = allData[key].findIndex(item => item.no_pokok == noPokok);
+        if (existingIndex >= 0) {
+            if (!confirm(`No. Pokok ${noPokok} sudah ada. Update data?`)) return;
+        }
+
+        const jarakInputs = document.querySelectorAll("#measurementTable .jarak");
+        const keterangan = document.getElementById("keteranganPokok").value;
+
+        const measurements = {};
+        for (let i = 0; i < jarakInputs.length; i++) {
+            const point = `p${i+1}`;
+            measurements[point] = jarakInputs[i].value ? parseFloat(jarakInputs[i].value) : "";
+        }
+
+        // Buat data pokok
+        const now = new Date();
+        const timestamp = now.toLocaleString();
+
+        const pokokData = {
+            no_pokok: noPokok,
+            ...measurements,
+            keterangan: keterangan,
+            verifikasi: {
+                askep: {
+                    keputusan: "",
+                    keterangan: "",
+                    timestamp: ""
+                },
+                mgr: {
+                    keputusan: "",
+                    keterangan: "",
+                    timestamp: ""
+                },
+                rc: {
+                    keputusan: "",
+                    keterangan: "",
+                    timestamp: ""
+                }
+            },
+            last_updated: timestamp
+        };
+
+        if (existingIndex >= 0) {
+            allData[key][existingIndex] = pokokData;
+        } else {
+            allData[key].push(pokokData);
+        }
+
+        // Urutkan berdasarkan no_pokok
+        allData[key].sort((a, b) => {
+
+            const numA = parseInt(a.no_pokok.match(/\d+/)[0]);
+            const numB = parseInt(b.no_pokok.match(/\d+/)[0]);
+
+            if (numA !== numB) return numA - numB;
+            return a.no_pokok.localeCompare(b.no_pokok);
+        });
+
+        lastActivity.saved = timestamp;
+        document.getElementById("lastSaved").textContent = `Terakhir disimpan: ${timestamp}`;
+
+        saveToLocalStorage();
+        updateReport();
+        resetForm(false);
+        alert(`Data No. Pokok ${noPokok} berhasil disimpan!`);
+    }
+
+    // Mereset Form
+    function resetForm(clearLocation) {
+        if (clearLocation) {
+            document.getElementById("estate").value = "";
+            document.getElementById("divisi").value = "";
+            document.getElementById("blok").value = "";
+            currentKey = "";
+        }
+
+        document.getElementById("no_pokok").value = "";
+        document.getElementById("keteranganPokok").value = "";
+
+        const jarakInputs = document.querySelectorAll("#measurementTable .jarak");
+
+        for (let i = 0; i < jarakInputs.length; i++) {
+            jarakInputs[i].value = "";
+            jarakInputs[i].parentElement.classList.remove("red-bg");
+        }
+    }
+
+    // Reset blok ini
+    function resetCurrentBlock() {
+        const estate = document.getElementById("estate").value.trim();
+        const divisi = document.getElementById("divisi").value.trim();
+        const blok = document.getElementById("blok").value.trim();
+
+        if (!estate || !divisi || !blok) {
+            alert("Harap isi Estate, Divisi, dan Blok terlebih dahulu!");
+            return;
+        }
+
+        const key = `${estate}_${divisi}_${blok}`;
+
+        if (allData[key] && allData[key].length > 0) {
+            if (confirm(`Apakah Anda yakin ingin menghapus SEMUA data untuk Blok ${blok}?`)) {
+                delete allData[key];
+                saveToLocalStorage();
+                updateReport();
+                resetForm(false);
+                alert(`Data untuk Blok ${blok} telah dihapus!`);
+            }
+        } else {
+            alert(`Tidak ada data untuk Blok ${blok}!`);
+        }
+    }
+
+    // Load data dari  Excel
+    function loadExcel() {
+        const fileInput = document.getElementById("uploadExcel");
+        const file = fileInput.files[0];
+
+        if (!file) {
+            alert("Pilih file Excel terlebih dahulu!");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, {
+                type: 'array'
+            });
+
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+
+            if (jsonData.length === 0) {
+                alert("File Excel kosong atau format tidak sesuai!");
+                return;
+            }
+
+            jsonData.forEach(row => {
+                const estate = row.Estate || "";
+                const divisi = row.Divisi || "";
+                const blok = row.Blok || "";
+                const noPokok = row["No. Pokok"] || "";
+
+                if (estate && divisi && blok && noPokok) {
+                    const key = `${estate}_${divisi}_${blok}`;
+                    const now = new Date().toLocaleString();
+
+                    if (!allData[key]) {
+                        allData[key] = [];
+                    }
+
+                    const exists = allData[key].some(item => item.no_pokok == noPokok);
+                    if (!exists) {
+                        allData[key].push({
+                            no_pokok: noPokok.toString(),
+                            p1: row.P1 || "",
+                            p2: row.P2 || "",
+                            p3: row.P3 || "",
+                            p4: row.P4 || "",
+                            p5: row.P5 || "",
+                            p6: row.P6 || "",
+                            keterangan: row.Keterangan || "",
+                            verifikasi: {
+                                askep: {
+                                    keputusan: row.Askep || "",
+                                    keterangan: row["Keterangan Askep"] || "",
+                                    timestamp: now
+                                },
+                                mgr: {
+                                    keputusan: row.MGR || "",
+                                    keterangan: row["Keterangan MGR"] || "",
+                                    timestamp: now
+                                },
+                                rc: {
+                                    keputusan: row.RC || "",
+                                    keterangan: row["Keterangan RC"] || "",
+                                    timestamp: now
+                                }
+                            },
+                            last_updated: now
+                        });
+                    }
+                }
+            });
+
+            for (const key in allData) {
+                allData[key].sort((a, b) => {
+                    // Extract numeric part for comparison
+                    const numA = parseInt(a.no_pokok.match(/\d+/)[0]);
+                    const numB = parseInt(b.no_pokok.match(/\d+/)[0]);
+
+                    if (numA !== numB) return numA - numB;
+                    return a.no_pokok.localeCompare(b.no_pokok);
+                });
+            }
+
+            saveToLocalStorage();
+            updateReport();
+            updateVerifikasiSummary();
+            alert(`Data berhasil diimpor! Total blok: ${Object.keys(allData).length}`);
+        };
+
+        reader.readAsArrayBuffer(file);
+    }
+
+    // Cari pokok verifikasi
+    function findPokok() {
+        const noPokok = document.getElementById("searchPokok").value;
+        if (!noPokok) {
+            alert("Masukkan No. Pokok terlebih dahulu!");
+            return;
+        }
+
+        let found = false;
+        let pokokData = null;
+        let foundKey = "";
+
+        for (const key in allData) {
+            const pokok = allData[key].find(item => item.no_pokok == noPokok);
+            if (pokok) {
+                found = true;
+                pokokData = pokok;
+                foundKey = key;
+                break;
+            }
+        }
+
+        if (!found) {
+            alert(`No. Pokok ${noPokok} tidak ditemukan!`);
+            document.getElementById("verificationData").style.display = "none";
+            document.getElementById("askepResult").textContent = "";
+            return;
+        }
+
+        const [estate, divisi, blok] = foundKey.split("_");
+
+        const askepResult = pokokData.verifikasi.askep.keputusan ?
+            `Hasil Verifikasi Askep: ${pokokData.verifikasi.askep.keputusan} - ${pokokData.verifikasi.askep.keterangan || '-'}` :
+            "Belum ada verifikasi Askep";
+        const mgrResult = pokokData.verifikasi.mgr.keputusan ?
+            `Hasil Verifikasi MGR: ${pokokData.verifikasi.mgr.keputusan} - ${pokokData.verifikasi.mgr.keterangan || '-'}` :
+            " ";
+        const rcResult = pokokData.verifikasi.rc.keputusan ?
+            `Hasil Verifikasi RC/VPA: ${pokokData.verifikasi.rc.keputusan} - ${pokokData.verifikasi.rc.keterangan || '-'}` :
+            " ";
+        document.getElementById("askepResult").innerHTML =
+            `${askepResult}<br>${mgrResult}<br>${rcResult}`;
+
+        const verificationTable = document.getElementById("verificationTable");
+
+        while (verificationTable.rows.length > 1) {
+            verificationTable.deleteRow(1);
+        }
+
+        let measurementCount = 0;
+        let below6_4Count = 0;
+
+        for (let i = 1; i <= 6; i++) {
+            const row = verificationTable.insertRow();
+            const cell1 = row.insertCell(0);
+            const cell2 = row.insertCell(1);
+
+            cell1.innerHTML = `P${i}`;
+            const distance = pokokData[`p${i}`];
+            cell2.innerHTML = distance === "" ? "" : distance;
+
+            if (distance !== "" && parseFloat(distance) > 0 && parseFloat(distance) <= 6.4) {
+                row.classList.add("red-bg");
+                below6_4Count++;
+            }
+
+            if (distance !== "") {
+                measurementCount++;
+            }
+        }
+
+        document.getElementById("measurementSummary").innerHTML =
+            `<p>Pengukuran: ${measurementCount} dari 6 titik (${measurementCount < 6 ? "Ada titik tidak diukur" : "Semua titik terukur"})</p>
+                 <p>Titik ≤ 6.4m: ${below6_4Count} (selain 0)</p>`;
+
+        // Set keterangan
+        document.getElementById("keteranganPokokVerifikasi").value = pokokData.keterangan || "";
+
+        currentPokok = {
+            key: foundKey,
+            no_pokok: noPokok,
+            estate: estate,
+            divisi: divisi,
+            blok: blok
+        };
+
+        document.getElementById("verificationData").style.display = "block";
+
+
+    }
+
+    // Simpan data verifikasi
+    function saveVerification() {
+        if (!currentPokok) {
+            alert("Tidak ada data pokok yang dipilih!");
+            return;
+        }
+
+        const level = document.getElementById("verifierLevel").value;
+        const keputusan = document.getElementById("keputusan").value;
+        const keterangan = document.getElementById("keteranganPokokVerifikasi").value;
+
+        if (!keputusan) {
+            alert("Pilih keputusan verifikasi terlebih dahulu!");
+            return;
+        }
+
+        // Cari pokok
+        const pokokIndex = allData[currentPokok.key].findIndex(
+            item => item.no_pokok == currentPokok.no_pokok
+        );
+
+        if (pokokIndex >= 0) {
+            const now = new Date().toLocaleString();
+
+            allData[currentPokok.key][pokokIndex].verifikasi[level] = {
+                keputusan: keputusan,
+                keterangan: keterangan,
+                timestamp: now
+            };
+
+            // Update keterangan
+            allData[currentPokok.key][pokokIndex].keterangan = keterangan;
+            allData[currentPokok.key][pokokIndex].last_updated = now;
+
+            lastActivity.verified = now;
+            document.getElementById("lastVerified").textContent = `Terakhir diverifikasi: ${now}`;
+
+            saveToLocalStorage();
+            updateReport();
+            updateVerifikasiSummary();
+            alert(`Verifikasi ${level.toUpperCase()} untuk No. Pokok ${currentPokok.no_pokok} berhasil disimpan!`);
+        } else {
+            alert("Data pokok tidak ditemukan!");
+        }
+    }
+
+    // Tambah pokok baru
+    function addNewPokok() {
+        if (!currentPokok) {
+            alert("Tidak ada konteks blok untuk menambah pokok baru!");
+            return;
+        }
+
+        // Pindah ke tab identifikasi
+        document.getElementById("identifikasi").style.display = "block";
+        document.getElementById("verifikasi").style.display = "none";
+
+        const tablinks = document.getElementsByClassName("tablinks");
+        for (let i = 0; i < tablinks.length; i++) {
+            tablinks[i].className = tablinks[i].className.replace(" active", "");
+        }
+        document.querySelector('.tab button:nth-child(1)').className += " active";
+
+        // ambil estate, divisi, blok
+        document.getElementById("estate").value = currentPokok.estate;
+        document.getElementById("divisi").value = currentPokok.divisi;
+        document.getElementById("blok").value = currentPokok.blok;
+
+        // Fokus ke no pokok
+        document.getElementById("no_pokok").focus();
+
+        // Tabah huruf 'B'
+        const baseNumber = currentPokok.no_pokok.replace(/[^0-9]/g, '');
+        const suffix = currentPokok.no_pokok.replace(/[0-9]/g, '') || '';
+        const newSuffix = suffix ? String.fromCharCode(suffix.charCodeAt(0) + 1) : 'B';
+        document.getElementById("no_pokok").value = baseNumber + newSuffix;
+    }
+
+    function countTotalVerifiedBPokok(level) {
+        let total = 0;
+        for (const key in allData) {
+            allData[key].forEach(pokok => {
+                if (pokok.no_pokok.includes('B') && pokok.verifikasi[level].keputusan) {
+                    total++;
+                }
+            });
+        }
+        return total;
+    }
+
+    function generateReport() {
+        const now = new Date().toLocaleString();
+        lastActivity.reported = now;
+        document.getElementById("reportTimestamp").textContent = `Terakhir diperbarui: ${now}`;
+        updateReport();
+    }
+
+    function updateReport() {
+        let totalPokok = 0;
+        let lastPokok = "-";
+        const counts = {
+            Y: 0,
+            N: 0,
+            AB: 0,
+            TK: 0,
+            NA: 0
+        };
+        const reportLevel = document.getElementById("reportLevel").value;
+
+        const totalBPokokVerified = reportLevel === "all" ?
+            0 :
+            countTotalVerifiedBPokok(reportLevel);
+
+        for (const key in allData) {
+            totalPokok += allData[key].length;
+
+            if (allData[key].length > 0) {
+                const last = allData[key][allData[key].length - 1];
+                lastPokok = (lastPokok === "-" || last.no_pokok > lastPokok) ? last.no_pokok : lastPokok;
+            }
+            allData[key].forEach(pokok => {
+                if (reportLevel === "all") {
+                    if (pokok.verifikasi.askep.keputusan) counts[pokok.verifikasi.askep.keputusan]++;
+                    if (pokok.verifikasi.mgr.keputusan) counts[pokok.verifikasi.mgr.keputusan]++;
+                    if (pokok.verifikasi.rc.keputusan) counts[pokok.verifikasi.rc.keputusan]++;
+                } else if (pokok.verifikasi[reportLevel].keputusan) {
+                    counts[pokok.verifikasi[reportLevel].keputusan]++;
+                }
+            });
+        }
+
+        const adjustedN = reportLevel === "all" ?
+            counts.N :
+            Math.max(0, counts.N - totalBPokokVerified);
+
+        const adjustedTotal = reportLevel === "all" ?
+            totalPokok :
+            Math.max(0, totalPokok - totalBPokokVerified);
+
+        document.getElementById("totalPokok").textContent = totalPokok;
+        document.getElementById("countY").textContent = counts.Y;
+        document.getElementById("countN").textContent = adjustedN;
+        document.getElementById("countAB").textContent = counts.AB;
+        document.getElementById("countTK").textContent = counts.TK;
+        document.getElementById("countNA").textContent = counts.NA;
+        document.getElementById("totalAll").textContent = adjustedTotal;
+        document.getElementById("lastPokok").textContent = lastPokok;
+
+        // Perhitungan persentese
+        if (adjustedTotal > 0) {
+            document.getElementById("percentY").textContent = `${Math.round(counts.Y/adjustedTotal*100)}%`;
+            document.getElementById("percentN").textContent = `${Math.round(adjustedN/adjustedTotal*100)}%`;
+            document.getElementById("percentAB").textContent = `${Math.round(counts.AB/adjustedTotal*100)}%`;
+            document.getElementById("percentTK").textContent = `${Math.round(counts.TK/adjustedTotal*100)}%`;
+            document.getElementById("percentNA").textContent = `${Math.round(counts.NA/adjustedTotal*100)}%`;
+        } else {
+            document.getElementById("percentY").textContent = "0%";
+            document.getElementById("percentN").textContent = "0%";
+            document.getElementById("percentAB").textContent = "0%";
+            document.getElementById("percentTK").textContent = "0%";
+            document.getElementById("percentNA").textContent = "0%";
+        }
+
+        reportData = [];
+        for (const key in allData) {
+            const [estate, divisi, blok] = key.split("_");
+            allData[key].forEach(pokok => {
+                let belowCount = 0;
+                for (let i = 1; i <= 6; i++) {
+                    const d = pokok[`p${i}`];
+                    if (d !== "" && parseFloat(d) > 0 && parseFloat(d) <= 6.4) {
+                        belowCount++;
+                    }
+                }
+
+                reportData.push({
+                    estate,
+                    divisi,
+                    blok,
+                    no_pokok: pokok.no_pokok,
+                    p1: pokok.p1 || "",
+                    p2: pokok.p2 || "",
+                    p3: pokok.p3 || "",
+                    p4: pokok.p4 || "",
+                    p5: pokok.p5 || "",
+                    p6: pokok.p6 || "",
+                    below6_4Count: belowCount,
+                    askep: pokok.verifikasi.askep.keputusan || "-",
+                    mgr: pokok.verifikasi.mgr.keputusan || "-",
+                    rc: pokok.verifikasi.rc.keputusan || "-",
+                    keterangan: pokok.keterangan || "-",
+                    last_updated: pokok.last_updated || ""
+                });
+            });
+        }
+
+        setupReportPagination();
+    }
+
+    function setupReportPagination() {
+        const pageSize = parseInt(document.getElementById('pageSizeReport').value, 10);
+        const searchTerm = document.getElementById('searchReport').value.trim().toLowerCase();
+
+        const filtered = reportData.filter(item => {
+            return Object.values(item).some(v =>
+                String(v).toLowerCase().includes(searchTerm)
+            );
+        });
+
+        const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+
+        const controlsDiv = document.getElementById('paginationReportControls');
+        let currentPage = parseInt(controlsDiv.getAttribute('data-current-page')) || 1;
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+        controlsDiv.setAttribute('data-current-page', currentPage);
+
+        renderReportPage(filtered, currentPage, pageSize, totalPages);
+    }
+
+    function renderReportPage(dataArray, page, pageSize, totalPages) {
+        const tbody = document.getElementById('reportTable').getElementsByTagName('tbody')[0];
+        tbody.innerHTML = '';
+
+        const startIdx = (page - 1) * pageSize;
+        const endIdx = startIdx + pageSize;
+        const pageSlice = dataArray.slice(startIdx, endIdx);
+
+        pageSlice.forEach(item => {
+            const row = tbody.insertRow();
+
+            // Kolom Estate, Divisi, Blok, No.Pokok
+            row.insertCell(0).textContent = item.estate;
+            row.insertCell(1).textContent = item.divisi;
+            row.insertCell(2).textContent = item.blok;
+            row.insertCell(3).textContent = item.no_pokok;
+
+            // Kolom P1–P6 warna merah jika ≤ 6.4
+            for (let i = 1; i <= 6; i++) {
+                const cell = row.insertCell(3 + i);
+                const val = item[`p${i}`];
+                cell.textContent = val === "" ? "" : val;
+                if (val !== "" && !isNaN(parseFloat(val)) && parseFloat(val) > 0 && parseFloat(val) <=
+                    6.4) {
+                    cell.classList.add("red-bg");
+                }
+            }
+
+            // Kolom “≤6.4m”
+            const cellBelow = row.insertCell(10);
+            cellBelow.textContent = item.below6_4Count;
+            if (item.below6_4Count === 1) {
+                cellBelow.classList.add("yellow-bg");
+            } else if (item.below6_4Count > 1) {
+                cellBelow.classList.add("blue-bg");
+            }
+
+            // Kolom Verifikasi (Askep, MGR, RC/VPA)
+            row.insertCell(11).textContent = item.askep;
+            row.insertCell(12).textContent = item.mgr;
+            row.insertCell(13).textContent = item.rc;
+
+            // Kolom Keterangan & Terakhir Diubah
+            row.insertCell(14).textContent = item.keterangan;
+            row.insertCell(15).textContent = item.last_updated;
+
+            // Kolom Aksi (Edit + Hapus)
+            const actionCell = row.insertCell(16);
+            const editBtn = document.createElement("button");
+            editBtn.textContent = "Edit";
+            editBtn.style.backgroundColor = "#2196F3";
+            editBtn.style.color = "white";
+            editBtn.style.marginRight = "5px";
+            editBtn.style.padding = "4px 8px";
+            editBtn.style.border = "none";
+            editBtn.style.borderRadius = "3px";
+            editBtn.style.cursor = "pointer";
+            editBtn.onclick = function () {
+                editPokokData(`${item.estate}_${item.divisi}_${item.blok}`, item.no_pokok);
+            };
+            actionCell.appendChild(editBtn);
+
+            const deleteBtn = document.createElement("button");
+            deleteBtn.textContent = "Hapus";
+            deleteBtn.style.backgroundColor = "#f44336";
+            deleteBtn.style.color = "white";
+            deleteBtn.style.padding = "4px 8px";
+            deleteBtn.style.border = "none";
+            deleteBtn.style.borderRadius = "3px";
+            deleteBtn.style.cursor = "pointer";
+            deleteBtn.onclick = function () {
+                deletePokokData(`${item.estate}_${item.divisi}_${item.blok}`, item.no_pokok);
+            };
+            actionCell.appendChild(deleteBtn);
+        });
+
+        renderReportPaginationControls(totalPages, page);
+        updateHighlightedTextColor();
+    }
+
+    function renderReportPaginationControls(totalPages, currentPage) {
+        const container = document.getElementById('paginationReportControls');
+        container.innerHTML = '';
+
+        if (totalPages <= 1) {
+            container.removeAttribute('data-current-page');
+            return;
+        }
+
+        const prevBtn = document.createElement("button");
+        prevBtn.textContent = "Prev";
+        prevBtn.disabled = (currentPage === 1);
+        prevBtn.style.padding = "4px 8px";
+        prevBtn.style.borderRadius = "3px";
+        prevBtn.style.cursor = currentPage === 1 ? "not-allowed" : "pointer";
+        prevBtn.onclick = () => changeReportPage(currentPage - 1);
+        container.appendChild(prevBtn);
+
+        for (let i = 1; i <= totalPages; i++) {
+            if (
+                i === 1 ||
+                i === totalPages ||
+                (i >= currentPage - 1 && i <= currentPage + 1)
+            ) {
+                const pageBtn = document.createElement("button");
+                pageBtn.textContent = i;
+                pageBtn.disabled = (i === currentPage);
+                pageBtn.style.padding = "4px 8px";
+                pageBtn.style.margin = "0 2px";
+                pageBtn.style.borderRadius = "3px";
+                pageBtn.style.cursor = i === currentPage ? "not-allowed" : "pointer";
+                pageBtn.onclick = () => changeReportPage(i);
+                container.appendChild(pageBtn);
+            } else if (
+                (i === 2 && currentPage > 5) ||
+                (i === totalPages - 1 && currentPage < totalPages - 2)
+            ) {
+                const ell = document.createElement("span");
+                ell.textContent = "...";
+                ell.style.margin = "0 4px";
+                container.appendChild(ell);
+            }
+        }
+        const nextBtn = document.createElement("button");
+        nextBtn.textContent = "Next";
+        nextBtn.disabled = (currentPage === totalPages);
+        nextBtn.style.padding = "4px 8px";
+        nextBtn.style.borderRadius = "3px";
+        nextBtn.style.cursor = currentPage === totalPages ? "not-allowed" : "pointer";
+        nextBtn.onclick = () => changeReportPage(currentPage + 1);
+        container.appendChild(nextBtn);
+
+        container.setAttribute('data-current-page', currentPage);
+    }
+
+    function changeReportPage(newPage) {
+        const controlsDiv = document.getElementById('paginationReportControls');
+        controlsDiv.setAttribute('data-current-page', newPage);
+        setupReportPagination();
+    }
+
+    // Export data ke Excel
+    function exportToExcel() {
+        if (!currentKey || !allData[currentKey] || allData[currentKey].length === 0) {
+            alert("Tidak ada data untuk diexport!");
+            return;
+        }
+
+        const estate = document.getElementById("estate").value || "TO";
+        const divisi = document.getElementById("divisi").value || "1";
+        const blok = document.getElementById("blok").value || "A1";
+
+        // Persiapan data
+        const exportData = allData[currentKey].map(pokok => {
+            return {
+                "Estate": estate,
+                "Divisi": divisi,
+                "Blok": blok,
+                "No. Pokok": pokok.no_pokok,
+                "P1": pokok.p1,
+                "P2": pokok.p2,
+                "P3": pokok.p3,
+                "P4": pokok.p4,
+                "P5": pokok.p5,
+                "P6": pokok.p6,
+                "Keterangan": pokok.keterangan,
+                "Askep": pokok.verifikasi.askep.keputusan,
+                "Keterangan Askep": pokok.verifikasi.askep.keterangan,
+                "Waktu Askep": pokok.verifikasi.askep.timestamp || "",
+                "MGR": pokok.verifikasi.mgr.keputusan,
+                "Keterangan MGR": pokok.verifikasi.mgr.keterangan,
+                "Waktu MGR": pokok.verifikasi.mgr.timestamp || "",
+                "RC/VPA": pokok.verifikasi.rc.keputusan,
+                "Keterangan RC/VPA": pokok.verifikasi.rc.keterangan,
+                "Waktu RC/VPA": pokok.verifikasi.rc.timestamp || "",
+                "Terakhir Diubah": pokok.last_updated || ""
+            };
+        });
+
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Data_TO");
+
+        const fileName = `TO_${estate}_Div${divisi}_Blok${blok}_${new Date().toISOString().slice(0,10)}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+    }
+
+    // Export semua data Excel
+    function exportAllToExcel() {
+        if (Object.keys(allData).length === 0) {
+            alert("Tidak ada data untuk diexport!");
+            return;
+        }
+
+        let allExportData = [];
+
+        for (const key in allData) {
+            const [estate, divisi, blok] = key.split("_");
+
+            allData[key].forEach(pokok => {
+                allExportData.push({
+                    "Estate": estate,
+                    "Divisi": divisi,
+                    "Blok": blok,
+                    "No. Pokok": pokok.no_pokok,
+                    "P1": pokok.p1,
+                    "P2": pokok.p2,
+                    "P3": pokok.p3,
+                    "P4": pokok.p4,
+                    "P5": pokok.p5,
+                    "P6": pokok.p6,
+                    "Keterangan": pokok.keterangan,
+                    "Askep": pokok.verifikasi.askep.keputusan,
+                    "Keterangan Askep": pokok.verifikasi.askep.keterangan,
+                    "Waktu Askep": pokok.verifikasi.askep.timestamp || "",
+                    "MGR": pokok.verifikasi.mgr.keputusan,
+                    "Keterangan MGR": pokok.verifikasi.mgr.keterangan,
+                    "Waktu MGR": pokok.verifikasi.mgr.timestamp || "",
+                    "RC/VPA": pokok.verifikasi.rc.keputusan,
+                    "Keterangan RC/VPA": pokok.verifikasi.rc.keterangan,
+                    "Waktu RC/VPA": pokok.verifikasi.rc.timestamp || "",
+                    "Terakhir Diubah": pokok.last_updated || ""
+                });
+            });
+        }
+
+        const ws = XLSX.utils.json_to_sheet(allExportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Data_TO");
+
+        XLSX.writeFile(wb, `TO_ALL_DATA_${new Date().toISOString().slice(0,10)}.xlsx`);
+    }
+
+    // Konfirmasi hapus semua data
+    function confirmDelete() {
+        if (confirm("Apakah Anda yakin ingin menghapus SEMUA data? Tindakan ini tidak dapat dibatalkan!")) {
+            deleteAllData();
+        }
+    }
+
+    // Hapus semua data
+    function deleteAllData() {
+        allData = {};
+        localStorage.removeItem("toData");
+        lastActivity = {
+            saved: null,
+            verified: null,
+            reported: null
+        };
+
+        document.getElementById("lastSaved").textContent = "Terakhir disimpan: -";
+        document.getElementById("lastVerified").textContent = "Terakhir diverifikasi: -";
+        document.getElementById("reportTimestamp").textContent = "Terakhir diperbarui: -";
+
+        updateReport();
+        resetForm(true);
+        updateStorageBar();
+        alert("Semua data telah dihapus!");
+    }
+
+    // Simpan localStorage
+    function saveToLocalStorage() {
+        const dataToSave = {
+            appData: allData,
+            lastActivity: lastActivity
+        };
+        localStorage.setItem("toData", JSON.stringify(dataToSave));
+        updateStorageBar();
+    }
+
+    // Muat dari localStorage
+    function loadFromLocalStorage() {
+        const savedData = localStorage.getItem("toData");
+        if (savedData) {
+            const parsedData = JSON.parse(savedData);
+            allData = parsedData.appData || {};
+            lastActivity = parsedData.lastActivity || {
+                saved: null,
+                verified: null,
+                reported: null
+            };
+
+            if (lastActivity.saved) {
+                document.getElementById("lastSaved").textContent = `Terakhir disimpan: ${lastActivity.saved}`;
+            }
+            if (lastActivity.verified) {
+                document.getElementById("lastVerified").textContent =
+                    `Terakhir diverifikasi: ${lastActivity.verified}`;
+            }
+            if (lastActivity.reported) {
+                document.getElementById("reportTimestamp").textContent =
+                    `Terakhir diperbarui: ${lastActivity.reported}`;
+            }
+        }
+    }
+
+    // Tab Verifikasi
+    function updateVerifikasiSummary() {
+        const elVerifierLevel = document.getElementById('verifierLevel');
+        const elTotalPokokVerif = document.getElementById('totalPokokVerif');
+        const elCountVerifiedVerif = document.getElementById('countVerifiedVerif');
+        const elCountUnverifiedVerif = document.getElementById('countUnverifiedVerif');
+
+        if (!elVerifierLevel || !elTotalPokokVerif || !elCountVerifiedVerif || !elCountUnverifiedVerif) {
+            return;
+        }
+
+        const level = elVerifierLevel.value;
+        let total = 0,
+            verified = 0;
+
+        for (const key in allData) {
+            allData[key].forEach(pokok => {
+                total++;
+                if (pokok.verifikasi[level].keputusan) {
+                    verified++;
+                }
+            });
+        }
+
+        const unverified = total - verified;
+        elTotalPokokVerif.textContent = total;
+        elCountVerifiedVerif.textContent = verified;
+        elCountUnverifiedVerif.textContent = unverified;
+    }
+
+    // Data Pokok Belum Verifikasi
+    let unverifiedData = [];
+
+    function showUnverifiedModal() {
+        const level = document.getElementById('verifierLevel').value;
+
+        unverifiedData = [];
+        for (const key in allData) {
+            const [estate, divisi, blok] = key.split('_');
+
+            allData[key].forEach(pokok => {
+                if (!pokok.verifikasi[level].keputusan) {
+                    let belowCount = 0;
+                    for (let i = 1; i <= 6; i++) {
+                        const d = pokok[`p${i}`];
+                        if (d !== "" && !isNaN(parseFloat(d)) && parseFloat(d) > 0 && parseFloat(d) <=
+                            6.4) {
+                            belowCount++;
+                        }
+                    }
+
+                    unverifiedData.push({
+                        estate,
+                        divisi,
+                        blok,
+                        no_pokok: pokok.no_pokok || "",
+                        p1: pokok.p1 || "",
+                        p2: pokok.p2 || "",
+                        p3: pokok.p3 || "",
+                        p4: pokok.p4 || "",
+                        p5: pokok.p5 || "",
+                        p6: pokok.p6 || "",
+                        below6_4Count: belowCount,
+                        askep: pokok.verifikasi.askep.keputusan || "-",
+                        mgr: pokok.verifikasi.mgr.keputusan || "-",
+                        rc: pokok.verifikasi.rc.keputusan || "-",
+                        keterangan: pokok.keterangan || "-",
+                        last_updated: pokok.last_updated || ""
+                    });
+                }
+            });
+        }
+
+        document.getElementById('totalUnverifiedCount').textContent = unverifiedData.length;
+
+        document.getElementById('unverifiedModal').style.display = 'block';
+        updateHighlightedTextColor();
+
+        setupUnverifiedPagination();
+    }
+
+    function closeUnverifiedModal() {
+        document.getElementById('unverifiedModal').style.display = 'none';
+    }
+
+    // Pengaturan Paging untuk tabel belum verifikasi
+    function setupUnverifiedPagination() {
+        const pageSize = parseInt(document.getElementById('pageSizeUnverified').value, 10);
+        const searchTerm = document.getElementById('searchUnverified').value.trim().toLowerCase();
+
+        const filtered = unverifiedData.filter(item => {
+            return Object.values(item).some(v =>
+                String(v).toLowerCase().includes(searchTerm)
+            );
+        });
+
+        const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+
+        const controlsDiv = document.getElementById('paginationUnverifiedControls');
+        let currentPage = parseInt(controlsDiv.getAttribute('data-current-page')) || 1;
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+        controlsDiv.setAttribute('data-current-page', currentPage);
+
+        renderUnverifiedPage(filtered, currentPage, pageSize, totalPages);
+    }
+
+    function renderUnverifiedPage(dataArray, page, pageSize, totalPages) {
+        const tbody = document.getElementById('unverifiedTable').querySelector('tbody');
+        tbody.innerHTML = '';
+
+        const startIdx = (page - 1) * pageSize;
+        const endIdx = startIdx + pageSize;
+        const pageSlice = dataArray.slice(startIdx, endIdx);
+
+        pageSlice.forEach(item => {
+            const row = tbody.insertRow();
+
+            // Estate, Divisi, Blok, No.Pokok
+            row.insertCell(0).textContent = item.estate;
+            row.insertCell(1).textContent = item.divisi;
+            row.insertCell(2).textContent = item.blok;
+            row.insertCell(3).textContent = item.no_pokok;
+
+            for (let i = 1; i <= 6; i++) {
+                const cell = row.insertCell(3 + i);
+                const val = item[`p${i}`];
+                cell.textContent = val === "" ? "" : val;
+                if (val !== "" && !isNaN(parseFloat(val)) && parseFloat(val) > 0 && parseFloat(val) <=
+                    6.4) {
+                    cell.classList.add('red-bg');
+                }
+            }
+
+            // Kolom “≤6.4m”
+            const cellBelow = row.insertCell(10);
+            cellBelow.textContent = item.below6_4Count;
+            if (item.below6_4Count === 1) {
+                cellBelow.classList.add('yellow-bg');
+            } else if (item.below6_4Count > 1) {
+                cellBelow.classList.add('blue-bg');
+            }
+
+            // Kolom Verifikasi Askep, MGR, RC/VPA
+            row.insertCell(11).textContent = item.askep;
+            row.insertCell(12).textContent = item.mgr;
+            row.insertCell(13).textContent = item.rc;
+
+            // Kolom Note & Terakhir Diubah
+            row.insertCell(14).textContent = item.keterangan;
+            row.insertCell(15).textContent = item.last_updated;
+        });
+
+        renderUnverifiedPaginationControls(totalPages, page);
+        updateHighlightedTextColor();
+    }
+
+    function renderUnverifiedPaginationControls(totalPages, currentPage) {
+        const container = document.getElementById('paginationUnverifiedControls');
+        container.innerHTML = '';
+
+        if (totalPages <= 1) {
+            container.removeAttribute('data-current-page');
+            return;
+        }
+
+        const prevBtn = document.createElement('button');
+        prevBtn.textContent = 'Prev';
+        prevBtn.disabled = (currentPage === 1);
+        prevBtn.style.padding = '4px 8px';
+        prevBtn.style.margin = '0 2px';
+        prevBtn.style.borderRadius = '3px';
+        prevBtn.style.cursor = currentPage === 1 ? 'not-allowed' : 'pointer';
+        prevBtn.onclick = () => changeUnverifiedPage(currentPage - 1);
+        container.appendChild(prevBtn);
+
+        for (let i = 1; i <= totalPages; i++) {
+            if (
+                i === 1 ||
+                i === totalPages ||
+                (i >= currentPage - 1 && i <= currentPage + 1)
+            ) {
+                const pageBtn = document.createElement('button');
+                pageBtn.textContent = i;
+                pageBtn.disabled = (i === currentPage);
+                pageBtn.style.padding = '4px 8px';
+                pageBtn.style.margin = '0 2px';
+                pageBtn.style.borderRadius = '3px';
+                pageBtn.style.cursor = i === currentPage ? 'not-allowed' : 'pointer';
+                pageBtn.onclick = () => changeUnverifiedPage(i);
+                container.appendChild(pageBtn);
+            } else if (
+                (i === 2 && currentPage > 4) ||
+                (i === totalPages - 1 && currentPage < totalPages - 3)
+            ) {
+                const ell = document.createElement('span');
+                ell.textContent = '...';
+                ell.style.margin = '0 4px';
+                container.appendChild(ell);
+            }
+        }
+
+        const nextBtn = document.createElement('button');
+        nextBtn.textContent = 'Next';
+        nextBtn.disabled = (currentPage === totalPages);
+        nextBtn.style.padding = '4px 8px';
+        nextBtn.style.margin = '0 2px';
+        nextBtn.style.borderRadius = '3px';
+        nextBtn.style.cursor = currentPage === totalPages ? 'not-allowed' : 'pointer';
+        nextBtn.onclick = () => changeUnverifiedPage(currentPage + 1);
+        container.appendChild(nextBtn);
+
+        container.setAttribute('data-current-page', currentPage);
+    }
+
+    function changeUnverifiedPage(newPage) {
+        const controlsDiv = document.getElementById('paginationUnverifiedControls');
+        controlsDiv.setAttribute('data-current-page', newPage);
+        setupUnverifiedPagination();
+    }
+
+    // URL GAS
+    const GOOGLE_APPS_SCRIPT_URL =
+        'https://script.google.com/macros/s/AKfycbz7HD5p_LuJHooazTfOapSpX4xbvPKWoqUxuM-57DwqNZQC79MDqNG2wS7VPOOgeR20cg/exec';
+
+    function syncToGoogleSheet() {
+        const btn = document.getElementById('btnSyncGoogleSheet');
+        const status = document.getElementById('syncStatus');
+        btn.disabled = true;
+        status.textContent = 'Mengirim data...';
+
+        let exportData = [];
+        for (const key in allData) {
+            const [estate, divisi, blok] = key.split("_");
+            allData[key].forEach(pokok => {
+                exportData.push({
+                    Estate: estate,
+                    Divisi: divisi,
+                    Blok: blok,
+                    No_Pokok: pokok.no_pokok,
+                    P1: pokok.p1,
+                    P2: pokok.p2,
+                    P3: pokok.p3,
+                    P4: pokok.p4,
+                    P5: pokok.p5,
+                    P6: pokok.p6,
+                    Keterangan: pokok.keterangan,
+                    Askep: pokok.verifikasi.askep.keputusan,
+                    Keterangan_Askep: pokok.verifikasi.askep.keterangan,
+                    Waktu_Askep: pokok.verifikasi.askep.timestamp || "",
+                    MGR: pokok.verifikasi.mgr.keputusan,
+                    Keterangan_MGR: pokok.verifikasi.mgr.keterangan,
+                    Waktu_MGR: pokok.verifikasi.mgr.timestamp || "",
+                    RC_VPA: pokok.verifikasi.rc.keputusan,
+                    Keterangan_RC_VPA: pokok.verifikasi.rc.keterangan,
+                    Waktu_RC_VPA: pokok.verifikasi.rc.timestamp || "",
+                    Terakhir_Diubah: pokok.last_updated || ""
+                });
+            });
+        }
+
+        // Kirim ke GAS
+        fetch(GOOGLE_APPS_SCRIPT_URL, {
+                method: "POST",
+                mode: "no-cors",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    action: "sync",
+                    data: exportData
+                })
+            })
+            .then(() => {
+                status.textContent = "✅ Selesai!";
+                btn.disabled = false;
+            })
+            .catch(err => {
+                status.textContent = "❌ Gagal: " + err;
+                btn.disabled = false;
+            });
+    }
+
+    // Dark mode
+    document.addEventListener('DOMContentLoaded', function () {
+        const darkModeEnabled = localStorage.getItem('darkMode') === 'enabled';
+        if (darkModeEnabled) {
+            document.body.classList.add('dark-mode');
+            updateHighlightedTextColor();
+        }
+
+        const darkModeToggle = document.createElement('button');
+        darkModeToggle.id = 'darkModeToggle';
+        darkModeToggle.innerHTML = darkModeEnabled ? '☀️' : '🌙';
+        darkModeToggle.title = 'Toggle Dark Mode';
+        document.body.appendChild(darkModeToggle);
+
+        darkModeToggle.addEventListener('click', function () {
+            document.body.classList.toggle('dark-mode');
+            const isDarkMode = document.body.classList.contains('dark-mode');
+            localStorage.setItem('darkMode', isDarkMode ? 'enabled' : 'disabled');
+            darkModeToggle.innerHTML = isDarkMode ? '☀️' : '🌙';
+            updateHighlightedTextColor();
+        });
+
+    });
+
+    // Perbandingan pokok pindahan
+    let pokokBData = [];
+
+    function showPokokBModal() {
+        pokokBData = [];
+        for (const key in allData) {
+            const [estate, divisi, blok] = key.split('_');
+
+            allData[key].forEach(pokok => {
+                if (pokok.no_pokok.includes('B')) {
+                    const baseNumber = pokok.no_pokok.replace('B', '');
+                    const pokokTanpaB = allData[key].find(p => p.no_pokok === baseNumber);
+
+                    let status = "Sama";
+                    if (!pokokTanpaB) {
+                        status = "Tanpa B tidak ada";
+                    } else {
+                        const verifikasiB = pokok.verifikasi;
+                        const verifikasiTanpaB = pokokTanpaB.verifikasi;
+
+                        if (verifikasiB.askep.keputusan !== verifikasiTanpaB.askep.keputusan ||
+                            verifikasiB.mgr.keputusan !== verifikasiTanpaB.mgr.keputusan ||
+                            verifikasiB.rc.keputusan !== verifikasiTanpaB.rc.keputusan) {
+                            status = "OK";
+                        }
+                    }
+
+                    pokokBData.push({
+                        blok: `${estate}-${divisi}-${blok}`,
+                        no_pokok: `${pokok.no_pokok} vs ${baseNumber}`,
+                        b_askep: pokok.verifikasi.askep.keputusan || "-",
+                        b_mgr: pokok.verifikasi.mgr.keputusan || "-",
+                        b_rc: pokok.verifikasi.rc.keputusan || "-",
+                        tanpa_b_askep: pokokTanpaB ? (pokokTanpaB.verifikasi.askep.keputusan ||
+                            "-") : "-",
+                        tanpa_b_mgr: pokokTanpaB ? (pokokTanpaB.verifikasi.mgr.keputusan || "-") : "-",
+                        tanpa_b_rc: pokokTanpaB ? (pokokTanpaB.verifikasi.rc.keputusan || "-") : "-",
+                        status: status
+                    });
+                }
+            });
+        }
+
+        document.getElementById('totalPokokBCount').textContent = pokokBData.length;
+
+        document.getElementById('pokokBModal').style.display = 'block';
+        updateHighlightedTextColor();
+
+        setupPokokBPagination();
+    }
+
+    function closePokokBModal() {
+        document.getElementById('pokokBModal').style.display = 'none';
+    }
+
+    // Pengaturan Paging untuk Pokok Pindahan
+    function setupPokokBPagination() {
+        const pageSize = parseInt(document.getElementById('pageSizePokokB').value, 10);
+        const searchTerm = document.getElementById('searchPokokB').value.trim().toLowerCase();
+
+        const filtered = pokokBData.filter(item => {
+            return Object.values(item).some(v =>
+                String(v).toLowerCase().includes(searchTerm)
+            );
+        });
+
+        const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+
+        const controlsDiv = document.getElementById('paginationPokokBControls');
+        let currentPage = parseInt(controlsDiv.getAttribute('data-current-page')) || 1;
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+        controlsDiv.setAttribute('data-current-page', currentPage);
+
+        renderPokokBPage(filtered, currentPage, pageSize, totalPages);
+    }
+
+    function renderPokokBPage(dataArray, page, pageSize, totalPages) {
+        const tbody = document.getElementById('pokokBTable').querySelector('tbody');
+        tbody.innerHTML = '';
+
+        const startIdx = (page - 1) * pageSize;
+        const endIdx = startIdx + pageSize;
+        const pageSlice = dataArray.slice(startIdx, endIdx);
+
+        pageSlice.forEach(item => {
+            const row = tbody.insertRow();
+
+            row.insertCell(0).textContent = item.blok;
+            row.insertCell(1).textContent = item.no_pokok;
+
+            const bAskepCell = row.insertCell(2);
+            bAskepCell.textContent = item.b_askep;
+
+            const bMgrCell = row.insertCell(3);
+            bMgrCell.textContent = item.b_mgr;
+
+            const bRcCell = row.insertCell(4);
+            bRcCell.textContent = item.b_rc;
+
+            const tanpaBAskepCell = row.insertCell(5);
+            tanpaBAskepCell.textContent = item.tanpa_b_askep;
+
+            const tanpaBMgrCell = row.insertCell(6);
+            tanpaBMgrCell.textContent = item.tanpa_b_mgr;
+
+            const tanpaBRcCell = row.insertCell(7);
+            tanpaBRcCell.textContent = item.tanpa_b_rc;
+
+            const statusCell = row.insertCell(8);
+            statusCell.textContent = item.status;
+
+            // Warna status
+            if (item.status === "OK") {
+                statusCell.style.backgroundColor = "#ffcccc";
+                statusCell.style.color = "black";
+            } else if (item.status === "Tanpa B tidak ada") {
+                statusCell.style.backgroundColor = "#ffffcc";
+                statusCell.style.color = "black";
+            }
+        });
+
+        renderPokokBPaginationControls(totalPages, page);
+        updateHighlightedTextColor();
+    }
+
+    function renderPokokBPaginationControls(totalPages, currentPage) {
+        const container = document.getElementById('paginationPokokBControls');
+        container.innerHTML = '';
+
+        if (totalPages <= 1) {
+            container.removeAttribute('data-current-page');
+            return;
+        }
+
+        const prevBtn = document.createElement('button');
+        prevBtn.textContent = 'Prev';
+        prevBtn.disabled = (currentPage === 1);
+        prevBtn.style.padding = '4px 8px';
+        prevBtn.style.margin = '0 2px';
+        prevBtn.style.borderRadius = '3px';
+        prevBtn.style.cursor = currentPage === 1 ? 'not-allowed' : 'pointer';
+        prevBtn.onclick = () => changePokokBPage(currentPage - 1);
+        container.appendChild(prevBtn);
+
+        for (let i = 1; i <= totalPages; i++) {
+            if (
+                i === 1 ||
+                i === totalPages ||
+                (i >= currentPage - 1 && i <= currentPage + 1)
+            ) {
+                const pageBtn = document.createElement('button');
+                pageBtn.textContent = i;
+                pageBtn.disabled = (i === currentPage);
+                pageBtn.style.padding = '4px 8px';
+                pageBtn.style.margin = '0 2px';
+                pageBtn.style.borderRadius = '3px';
+                pageBtn.style.cursor = i === currentPage ? 'not-allowed' : 'pointer';
+                pageBtn.onclick = () => changePokokBPage(i);
+                container.appendChild(pageBtn);
+            } else if (
+                (i === 2 && currentPage > 4) ||
+                (i === totalPages - 1 && currentPage < totalPages - 3)
+            ) {
+                const ell = document.createElement('span');
+                ell.textContent = '...';
+                ell.style.margin = '0 4px';
+                container.appendChild(ell);
+            }
+        }
+
+        const nextBtn = document.createElement('button');
+        nextBtn.textContent = 'Next';
+        nextBtn.disabled = (currentPage === totalPages);
+        nextBtn.style.padding = '4px 8px';
+        nextBtn.style.margin = '0 2px';
+        nextBtn.style.borderRadius = '3px';
+        nextBtn.style.cursor = currentPage === totalPages ? 'not-allowed' : 'pointer';
+        nextBtn.onclick = () => changePokokBPage(currentPage + 1);
+        container.appendChild(nextBtn);
+
+        container.setAttribute('data-current-page', currentPage);
+    }
+
+    function changePokokBPage(newPage) {
+        const controlsDiv = document.getElementById('paginationPokokBControls');
+        controlsDiv.setAttribute('data-current-page', newPage);
+        setupPokokBPagination();
+    }
+
+    // Aktif Tracking
+    let trackingActive = false;
+    let trackingPaused = false;
+    let trackingWatchId = null;
+    let trackingData = [];
+    let trackingStartTime = null;
+    let trackingPauseTime = null;
+
+    // Start Tracking
+    function startTracking() {
+        if (!navigator.geolocation) {
+            alert('Perangkat tidak mendukung GPS!');
+            return;
+        }
+        if (trackingActive && !trackingPaused) return;
+        trackingActive = true;
+        trackingPaused = false;
+        trackingData = trackingData || [];
+        trackingStartTime = trackingStartTime || Date.now();
+        trackingPauseTime = null;
+        document.getElementById("btnTrackStart").disabled = true;
+        document.getElementById("btnTrackPause").disabled = false;
+        document.getElementById("btnTrackStop").disabled = false;
+        updateTrackingStatus("Perekaman dimulai...");
+
+        // Start
+        trackingWatchId = navigator.geolocation.watchPosition(
+            pos => {
+                const {
+                    latitude,
+                    longitude,
+                    accuracy
+                } = pos.coords;
+                trackingData.push({
+                    timestamp: Date.now(),
+                    latitude,
+                    longitude,
+                    accuracy
+                });
+                updateTrackingStatus(
+                    `Tracking: ${trackingData.length} titik. Lokasi: (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`
+                );
+            },
+            err => {
+                updateTrackingStatus("Gagal ambil lokasi: " + err.message);
+            }, {
+                enableHighAccuracy: true,
+                maximumAge: 0,
+                timeout: 10000
+            }
+        );
+    }
+
+    // Pause
+    function pauseTracking() {
+        if (!trackingActive || trackingPaused) return;
+        trackingPaused = true;
+        if (trackingWatchId !== null) {
+            navigator.geolocation.clearWatch(trackingWatchId);
+            trackingWatchId = null;
+        }
+        trackingPauseTime = Date.now();
+        document.getElementById("btnTrackStart").disabled = false;
+        document.getElementById("btnTrackPause").disabled = true;
+        document.getElementById("btnTrackStop").disabled = false;
+        updateTrackingStatus("Tracking dijeda (pause).");
+    }
+
+    // Stop dan simpan tracking
+    function stopTracking() {
+        if (!trackingActive) return;
+        trackingActive = false;
+        trackingPaused = false;
+        if (trackingWatchId !== null) {
+            navigator.geolocation.clearWatch(trackingWatchId);
+            trackingWatchId = null;
+        }
+        document.getElementById("btnTrackStart").disabled = false;
+        document.getElementById("btnTrackPause").disabled = true;
+        document.getElementById("btnTrackStop").disabled = true;
+
+        if (trackingData.length > 1) {
+            let history = JSON.parse(localStorage.getItem("trackingHistory_TO") || "[]");
+            let estate = document.getElementById("estate") ?.value ?.trim() || "-";
+            let divisi = document.getElementById("divisi") ?.value ?.trim() || "-";
+            let blok = document.getElementById("blok") ?.value ?.trim() || "-";
+            let namaBlok = `${estate}${divisi}${blok}`;
+            history.push({
+                id: Date.now(),
+                date: new Date(trackingStartTime).toLocaleString(),
+                duration: trackingPauseTime ?
+                    trackingPauseTime - trackingStartTime : Date.now() - trackingStartTime,
+                points: trackingData,
+                blok: namaBlok
+            });
+            localStorage.setItem("trackingHistory_TO", JSON.stringify(history));
+            updateTrackingStatus(
+                `Tracking disimpan (${trackingData.length} titik, durasi: ${Math.round((Date.now() - trackingStartTime)/1000)} detik)`
+            );
+        } else {
+            updateTrackingStatus("Tidak ada data tracking disimpan.");
+        }
+        trackingData = [];
+        trackingStartTime = null;
+        trackingPauseTime = null;
+
+        renderTrackingHistoryTable();
+    }
+
+
+    // Update status tampilan tracking
+    function updateTrackingStatus(msg) {
+        document.getElementById("tracking-status").textContent = msg;
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        document.getElementById("btnTrackStart").disabled = false;
+        document.getElementById("btnTrackPause").disabled = true;
+        document.getElementById("btnTrackStop").disabled = true;
+        renderTrackingHistoryTable();
+    });
+
+    // tabel tracking history
+    function renderTrackingHistoryTable() {
+        const table = document.getElementById("tracking-history-table").getElementsByTagName("tbody")[0];
+        let history = JSON.parse(localStorage.getItem("trackingHistory_TO") || "[]");
+        table.innerHTML = "";
+        if (history.length === 0) {
+            const row = table.insertRow();
+            let cell = row.insertCell(0);
+            cell.colSpan = 5;
+            cell.textContent = "Belum ada data tracking.";
+            return;
+        }
+        history.slice().reverse().forEach((item, idx) => {
+            let row = table.insertRow();
+            row.insertCell(0).textContent = item.date;
+            row.insertCell(1).textContent = item.blok || "-";
+            row.insertCell(2).textContent = msToTime(item.duration);
+            row.insertCell(3).textContent = item.points.length;
+            let cellAksi = row.insertCell(4);
+            cellAksi.innerHTML = `
+            <button class="aksi-btn btn-export" title="Export KML" onclick="exportTrackingKML(${item.id})">
+                <i class="fas fa-download"></i> Export KML
+            </button>
+            <button class="aksi-btn btn-delete" title="Hapus" onclick="deleteTrackingHistory(${item.id})">
+                <i class="fas fa-trash"></i> Hapus
+            </button>
+        `;
+        });
+    }
+
+
+    // Export ke .kml
+    function exportTrackingKML(id) {
+        let history = JSON.parse(localStorage.getItem("trackingHistory_TO") || "[]");
+        let item = history.find(h => h.id === id);
+        if (!item || !item.points || item.points.length < 2) {
+            alert("Data tracking tidak valid!");
+            return;
+        }
+
+        function pad2(n) {
+            return n.toString().padStart(2, "0");
+        }
+        let firstTimestamp = item.points[0].timestamp;
+        let dt = new Date(firstTimestamp);
+        let YY = pad2(dt.getFullYear() % 100);
+        let MM = pad2(dt.getMonth() + 1);
+        let DD = pad2(dt.getDate());
+        let HH = pad2(dt.getHours());
+        let mm = pad2(dt.getMinutes());
+        let ss = pad2(dt.getSeconds());
+        let namaBlok = (item.blok || "-").replace(/[^a-zA-Z0-9\-]/g, "");
+
+        // Nama file
+        let fileName = `${YY}${MM}${DD}${HH}${mm}${ss}_TrackingTO_${namaBlok}.kml`;
+
+        // Isi file KML
+        let kml = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Document>
+<name>Tracking Sensus ${item.date} [${namaBlok}]</name>
+<Placemark>
+  <name>Rute Sensus (${namaBlok})</name>
+  <LineString>
+    <tessellate>1</tessellate>
+    <coordinates>
+      ${item.points.map(pt => `${pt.longitude},${pt.latitude},0`).join("\n      ")}
+    </coordinates>
+  </LineString>
+</Placemark>
+</Document>
+</kml>`;
+        // Download
+        let blob = new Blob([kml], {
+            type: "application/vnd.google-earth.kml+xml"
+        });
+        let a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
+    // Hapus history tracking
+    function deleteTrackingHistory(id) {
+        if (!confirm("Hapus history tracking ini?")) return;
+        let history = JSON.parse(localStorage.getItem("trackingHistory_TO") || "[]");
+        history = history.filter(h => h.id !== id);
+        localStorage.setItem("trackingHistory_TO", JSON.stringify(history));
+        renderTrackingHistoryTable();
+        updateStorageBar();
+    }
+
+    // Helper format durasi
+    function msToTime(duration) {
+        let seconds = Math.floor((duration / 1000) % 60),
+            minutes = Math.floor((duration / (1000 * 60)) % 60),
+            hours = Math.floor(duration / (1000 * 60 * 60));
+        return `${hours > 0 ? hours + "j " : ""}${minutes}m ${seconds}s`;
+    }
+
+    const originalOpenTab2 = openTab;
+    openTab = function (evt, tabName) {
+        originalOpenTab2(evt, tabName);
+        if (tabName === "setting") {
+            renderTrackingHistoryTable();
+        }
+    };
+
+
+    // BAR Status Pemakaian LocalStorage
+    function getLocalStorageUsage() {
+        let total = 0;
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            const val = localStorage.getItem(key);
+            total += key.length + (val ? val.length : 0);
+        }
+        return total;
+    }
+
+    function updateStorageBar() {
+        const usedBytes = getLocalStorageUsage();
+        const maxBytes = 5 * 1024 * 1024; // 5MB
+        const percent = Math.min(usedBytes / maxBytes * 100, 100);
+        let color = "#3498db"; // biru
+        if (percent > 80) color = "#e74c3c"; // merah
+        else if (percent > 60) color = "#f1c40f"; // kuning
+
+        // Update bar
+        const bar = document.getElementById("storage-bar");
+        bar.style.width = percent + "%";
+        bar.style.background = color;
+
+        // Info teks
+        const usedMB = (usedBytes / (1024 * 1024)).toFixed(2);
+        const freeMB = (maxBytes / (1024 * 1024)).toFixed(0);
+        let info = `${usedMB} MB free of ${freeMB} MB`;
+
+        const infoText = document.getElementById("storage-info-text");
+        infoText.textContent = info;
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        updateStorageBar();
+    });
+</script>
+
+</html>
