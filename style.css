@@ -440,6 +440,12 @@ body.dark-mode #pokokBTable td[style*="background-color: #ffffcc"] {
     font-size: 12px;
 }
 
+#geo-map {
+    touch-action: auto !important;
+    -ms-touch-action: auto !important;
+}
+
+
 /* Versi Mobile */
 @media screen and (max-width: 600px) {
     table {
