@@ -1475,8 +1475,16 @@ function initGeoMap() {
     }).addTo(map);
 
     placemarksLayer = L.layerGroup().addTo(map);
-    trackingPolyline = L.polyline([], {color: '#ff5500', weight: 5}).addTo(map);
-    userMarker = L.circleMarker([0,0], {radius:8, color:'red', fillColor:'#f66', fillOpacity:1}).addTo(map);
+    trackingPolyline = L.polyline([], {
+        color: '#ff5500',
+        weight: 5
+    }).addTo(map);
+    userMarker = L.circleMarker([0, 0], {
+        radius: 8,
+        color: 'red',
+        fillColor: '#f66',
+        fillOpacity: 1
+    }).addTo(map);
     restorePlacemarks();
     renderPlacemarkTable();
 }
@@ -1500,7 +1508,11 @@ function startTracking() {
 
     trackingWatchId = navigator.geolocation.watchPosition(
         pos => {
-            const { latitude, longitude, accuracy } = pos.coords;
+            const {
+                latitude,
+                longitude,
+                accuracy
+            } = pos.coords;
             trackingData.push({
                 timestamp: Date.now(),
                 latitude,
@@ -1553,9 +1565,9 @@ function stopTracking() {
 
     if (trackingData.length > 1) {
         let history = JSON.parse(localStorage.getItem("trackingHistory") || "[]");
-        let estate = document.getElementById("estate")?.value?.trim() || "-";
-        let divisi = document.getElementById("divisi")?.value?.trim() || "-";
-        let blok = document.getElementById("blok")?.value?.trim() || "-";
+        let estate = document.getElementById("estate") ?.value ?.trim() || "-";
+        let divisi = document.getElementById("divisi") ?.value ?.trim() || "-";
+        let blok = document.getElementById("blok") ?.value ?.trim() || "-";
         let namaBlok = `${estate}${divisi}${blok}`;
         history.push({
             id: Date.now(),
@@ -1593,12 +1605,47 @@ function updateGeoMapTracking(dataArr) {
     }
     const latlngs = dataArr.map(pt => [pt.latitude, pt.longitude]);
     trackingPolyline.setLatLngs(latlngs);
-    let last = latlngs[latlngs.length-1];
+    let last = latlngs[latlngs.length - 1];
     if (last) userMarker.setLatLng(last);
 }
 
+function colorToHex(color) {
+  if (color === 'red')    return '#ff0000';
+  if (color === 'blue')   return '#007bff';
+  if (color === 'green')  return '#28a745';
+  if (color === 'orange') return '#ffa500';
+  if (color === 'purple') return '#800080';
+  return color;
+}
+
+function createColoredPlacemarkSVG(color = '#ff0000') {
+  return `
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" 
+         xmlns="http://www.w3.org/2000/svg">
+      <g>
+        <ellipse cx="16" cy="11" rx="7" ry="7" fill="${color}"/>
+        <path d="M16 30C16 30 5 20.3628 5 12.5C5 6.70101 10.4772 2 16 2C21.5228 2 27 6.70101 27 12.5C27 20.3628 16 30 16 30Z" fill="${color}" stroke="#666" stroke-width="2"/>
+        <circle cx="16" cy="13" r="3" fill="#fff" stroke="#888" stroke-width="1"/>
+      </g>
+    </svg>
+  `;
+}
+
+function createColoredPlacemarkIcon(color) {
+  let svg = createColoredPlacemarkSVG(color);
+  let url = "data:image/svg+xml;base64," + btoa(svg);
+  return L.icon({
+    iconUrl: url,
+    iconSize: [32, 32],
+    iconAnchor: [16, 32],
+    popupAnchor: [0, -28]
+  });
+}
+
+
+
 // PLACEMARK HANDLING
-function addPlacemark(latlng, note, color = 'blue') {
+function addPlacemark(latlng, note, color = 'red') {
     placemarks.push({
         lat: latlng.lat,
         lng: latlng.lng,
@@ -1606,27 +1653,32 @@ function addPlacemark(latlng, note, color = 'blue') {
         color: color
     });
     localStorage.setItem("geoPlacemarks", JSON.stringify(placemarks));
-    restorePlacemarks();
+    let icon = createColoredPlacemarkIcon(colorToHex(color));
+    if (placemarksLayer) {
+        let marker = L.marker([latlng.lat, latlng.lng], { icon: icon }).addTo(placemarksLayer);
+        if (note) marker.bindPopup(note).openPopup();
+    }
     renderPlacemarkTable();
 }
+
 
 function restorePlacemarks() {
     if (!placemarksLayer) return;
     placemarksLayer.clearLayers();
     placemarks.forEach((pm, i) => {
-        let marker = L.circleMarker([pm.lat, pm.lng], {
-            radius: 9, color: pm.color || 'blue', fillColor: pm.color || 'blue', fillOpacity: 0.7
-        }).addTo(placemarksLayer);
+        let icon = createColoredPlacemarkIcon(colorToHex(pm.color || 'red'));
+        let marker = L.marker([pm.lat, pm.lng], { icon: icon }).addTo(placemarksLayer);
         if (pm.note) marker.bindPopup(pm.note);
     });
 }
 
+
 function renderPlacemarkTable() {
     let tbody = document.getElementById('placemarkTable').querySelector('tbody');
     tbody.innerHTML = '';
-    placemarks.forEach((p,i) => {
+    placemarks.forEach((p, i) => {
         let tr = tbody.insertRow();
-        tr.insertCell(0).textContent = i+1;
+        tr.insertCell(0).textContent = i + 1;
         tr.insertCell(1).textContent = (+p.lat).toFixed(6);
         tr.insertCell(2).textContent = (+p.lng).toFixed(6);
         tr.insertCell(3).textContent = p.note;
@@ -1645,8 +1697,8 @@ function renderPlacemarkTable() {
         delBtn.textContent = "Hapus";
         delBtn.style.backgroundColor = "#dc3545";
         delBtn.style.color = "white";
-        delBtn.onclick = function(){
-            placemarks.splice(i,1);
+        delBtn.onclick = function () {
+            placemarks.splice(i, 1);
             localStorage.setItem("geoPlacemarks", JSON.stringify(placemarks));
             restorePlacemarks();
             renderPlacemarkTable();
@@ -1657,30 +1709,42 @@ function renderPlacemarkTable() {
 }
 
 // Export Semua Placemark ke KML
-document.getElementById('exportPlacemarkKML').onclick = function() {
+document.getElementById('exportPlacemarkKML').onclick = function () {
     if (!placemarks.length) return alert("Tidak ada placemark.");
     let kml = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Placemarks TO</name>`;
-    placemarks.forEach((p,i) => {
+    placemarks.forEach((p, i) => {
         kml += `<Placemark><name>${p.note||'Placemark '+(i+1)}</name>
       <Style><IconStyle><color>${colorToKMLHex(p.color)}</color></IconStyle></Style>
       <Point><coordinates>${p.lng},${p.lat},0</coordinates></Point>
     </Placemark>`;
     });
     kml += `</Document></kml>`;
-    let blob = new Blob([kml], {type:"application/vnd.google-earth.kml+xml"});
+    let blob = new Blob([kml], {
+        type: "application/vnd.google-earth.kml+xml"
+    });
     let a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = `placemark_TO_${(new Date()).toISOString().replace(/\W/g,'').slice(0,12)}.kml`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
 };
+
 function colorToKMLHex(c) {
     // KML pakai format aabbggrr (ARGB) → contoh merah 'ff0000ff'
-    const map = {red:"ff0000ff", blue:"ffff0000", green:"ff00ff00", orange:"ff00a5ff", purple:"ffff00ff"};
-    return map[c]||"ff0000ff";
+    const map = {
+        red: "ff0000ff",
+        blue: "ffff0000",
+        green: "ff00ff00",
+        orange: "ff00a5ff",
+        purple: "ffff00ff"
+    };
+    return map[c] || "ff0000ff";
 }
 
 // TOMBOL TAMBAH PLACEMARK DENGAN WARNA PILIHAN
 let lastPlacemarkColor = 'red';
+
 function showPlacemarkPrompt(latlng) {
     let html = `<label>Keterangan: <input id="pmNote" type="text" style="width:140px"></label><br>
         <label>Warna: <select id="pmColor">
@@ -1692,16 +1756,16 @@ function showPlacemarkPrompt(latlng) {
         </select></label>
         <br><button id="pmOkBtn">OK</button>`;
     let popup = L.popup().setLatLng(latlng).setContent(html).openOn(map);
-    setTimeout(()=>{
+    setTimeout(() => {
         document.getElementById('pmColor').value = lastPlacemarkColor;
-        document.getElementById('pmOkBtn').onclick = function() {
+        document.getElementById('pmOkBtn').onclick = function () {
             let note = document.getElementById('pmNote').value.trim();
             let color = document.getElementById('pmColor').value;
             lastPlacemarkColor = color;
             addPlacemark(latlng, note, color);
             map.closePopup(popup);
         };
-    },200);
+    }, 200);
 }
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -1709,15 +1773,17 @@ document.addEventListener("DOMContentLoaded", function () {
         initGeoMap();
         restorePlacemarks();
         renderPlacemarkTable();
-        map.on('click', function(e) {
-            showPlacemarkPrompt(e.latlng);
-        });
     }, 400);
     document.getElementById("btnTrackStart").disabled = false;
     document.getElementById("btnTrackPause").disabled = true;
     document.getElementById("btnTrackStop").disabled = true;
     renderTrackingHistoryTable();
 });
+
+document.getElementById('btnAddPlacemarkMap').onclick = function() {
+    let center = map.getCenter();
+    showPlacemarkPrompt(center);
+};
 
 // HISTORY TRACKING
 function renderTrackingHistoryTable() {
@@ -1745,6 +1811,7 @@ function renderTrackingHistoryTable() {
 `;
     });
 }
+
 function showTrackingOnMap(id) {
     let history = JSON.parse(localStorage.getItem("trackingHistory") || "[]");
     let item = history.find(h => h.id === id);
@@ -1754,14 +1821,14 @@ function showTrackingOnMap(id) {
     }
     updateGeoMapTracking(item.points);
     if (item.points.length) {
-        let last = item.points[item.points.length-1];
+        let last = item.points[item.points.length - 1];
         map.setView([last.latitude, last.longitude], map.getZoom());
     }
 }
 
 // OFFLINE MAP IMAGE (Gambar hasil screenshot Google Maps)
 // Cara pakai: Upload gambar, isi LatLng NW & SE, klik Terapkan
-document.getElementById('btnSetOfflineMap').onclick = function() {
+document.getElementById('btnSetOfflineMap').onclick = function () {
     const fileInput = document.getElementById('offlineMapInput');
     if (!fileInput.files.length) {
         alert('Pilih file gambar terlebih dahulu!');
@@ -1769,20 +1836,26 @@ document.getElementById('btnSetOfflineMap').onclick = function() {
     }
     let img = fileInput.files[0];
     let reader = new FileReader();
-    reader.onload = function(e) {
-        let nw = document.getElementById('offlineMapNW').value.split(',').map(x=>parseFloat(x.trim()));
-        let se = document.getElementById('offlineMapSE').value.split(',').map(x=>parseFloat(x.trim()));
-        if (nw.length!==2 || se.length!==2 || isNaN(nw[0])||isNaN(se[0])) {
+    reader.onload = function (e) {
+        let nw = document.getElementById('offlineMapNW').value.split(',').map(x => parseFloat(x.trim()));
+        let se = document.getElementById('offlineMapSE').value.split(',').map(x => parseFloat(x.trim()));
+        if (nw.length !== 2 || se.length !== 2 || isNaN(nw[0]) || isNaN(se[0])) {
             alert('LatLng belum valid!');
             return;
         }
         if (offlineImageLayer) map.removeLayer(offlineImageLayer);
-        offlineImageLayer = L.imageOverlay(e.target.result, [[nw[0],nw[1]],[se[0],se[1]]]).addTo(map);
-        map.fitBounds([[nw[0],nw[1]],[se[0],se[1]]]);
+        offlineImageLayer = L.imageOverlay(e.target.result, [
+            [nw[0], nw[1]],
+            [se[0], se[1]]
+        ]).addTo(map);
+        map.fitBounds([
+            [nw[0], nw[1]],
+            [se[0], se[1]]
+        ]);
     };
     reader.readAsDataURL(img);
 };
-document.getElementById('btnRemoveOfflineMap').onclick = function() {
+document.getElementById('btnRemoveOfflineMap').onclick = function () {
     if (offlineImageLayer) map.removeLayer(offlineImageLayer);
     offlineImageLayer = null;
 };
@@ -1795,7 +1868,10 @@ function exportTrackingKML(id) {
         alert("Data tracking tidak valid!");
         return;
     }
-    function pad2(n) { return n.toString().padStart(2, "0"); }
+
+    function pad2(n) {
+        return n.toString().padStart(2, "0");
+    }
     let firstTimestamp = item.points[0].timestamp;
     let dt = new Date(firstTimestamp);
     let YY = pad2(dt.getFullYear() % 100);
@@ -1821,7 +1897,9 @@ function exportTrackingKML(id) {
 </Placemark>
 </Document>
 </kml>`;
-    let blob = new Blob([kml], {type: "application/vnd.google-earth.kml+xml"});
+    let blob = new Blob([kml], {
+        type: "application/vnd.google-earth.kml+xml"
+    });
     let a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = fileName;
@@ -1829,6 +1907,7 @@ function exportTrackingKML(id) {
     a.click();
     document.body.removeChild(a);
 }
+
 function deleteTrackingHistory(id) {
     if (!confirm("Hapus history tracking ini?")) return;
     let history = JSON.parse(localStorage.getItem("trackingHistory") || "[]");
@@ -1837,6 +1916,7 @@ function deleteTrackingHistory(id) {
     renderTrackingHistoryTable();
     updateGeoMapTracking([]);
 }
+
 function msToTime(duration) {
     let seconds = Math.floor((duration / 1000) % 60),
         minutes = Math.floor((duration / (1000 * 60)) % 60),
@@ -1861,4 +1941,3 @@ openTab = function (evt, tabName) {
         }, 300);
     }
 };
-

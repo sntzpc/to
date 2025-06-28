@@ -110,7 +110,14 @@
         <div id="map-section" style="margin-top:24px;">
             <h4>Peta Tracking & Placemark</h4>
             <div id="geo-map"
-                style="height:320px;width:100%;border-radius:8px;border:1px solid #aaa;margin-bottom:12px;"></div>
+                style="height:320px;width:100%;border-radius:8px;border:1px solid #aaa;margin-bottom:12px;">
+                <div id="mapCenterMarker">+</div>
+                </div>
+        </div>
+        <div>
+            <button id="btnAddPlacemarkMap" class="btn btn-warning" type="button">
+                Placemark
+            </button>
         </div>
         <!-- Tambahan: Upload Offline Map Image -->
         <div class="section">
@@ -121,10 +128,12 @@
             <br>
             <label>LatLng Kiri-Atas: <input type="text" id="offlineMapNW" value="-2.27,113.90" size="14"></label>
             <label>LatLng Kanan-Bawah: <input type="text" id="offlineMapSE" value="-2.28,113.93" size="14"></label>
-            <button id="btnSetOfflineMap" type="button" style="background-color: hsl(51, 95%, 45%);color:black;">Terapkan Offline
+            <button id="btnSetOfflineMap" type="button"
+                style="background-color: hsl(51, 95%, 45%);color:black;">Terapkan Offline
                 Map</button>
-            <button id="btnRemoveOfflineMap" type="button" style="background-color: #f44336;color:#ffffff;">Hapus Offline Map</button>
-        </div> 
+            <button id="btnRemoveOfflineMap" type="button" style="background-color: #f44336;color:#ffffff;">Hapus
+                Offline Map</button>
+        </div>
         <div id="storage-info-section" style="margin-top: 20px;">
             <div style="margin-bottom:6px;font-weight:bold;">Storage Usage</div>
             <div id="storage-bar-wrapper"

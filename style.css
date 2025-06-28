@@ -441,8 +441,30 @@ body.dark-mode #pokokBTable td[style*="background-color: #ffffcc"] {
 }
 
 #geo-map {
+    position: relative;
+    /* pastikan tidak ada pointer-events:none di sini! */
+    pointer-events: auto !important;
     touch-action: auto !important;
     -ms-touch-action: auto !important;
+}
+.leaflet-container {
+    pointer-events: auto !important;
+    touch-action: auto !important;
+}
+
+#mapCenterMarker {
+    position: absolute;
+    z-index: 800;
+    left: 50%;
+    top: 50%;
+    width: 32px;
+    height: 32px;
+    margin-left: -16px;
+    margin-top: -16px;
+    pointer-events: none;      /* KUNCI AGAR PETA TIDAK TERHALANG! */
+    font-size: 32px;
+    color: #1976d2;
+    user-select: none;
 }
 
 
