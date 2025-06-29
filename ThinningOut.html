@@ -2865,18 +2865,41 @@ document.getElementById('btnSetOfflineMap').onclick = function () {
     let img = fileInput.files[0];
     let reader = new FileReader();
     reader.onload = function (e) {
-        let nw = document.getElementById('offlineMapNW').value.split(',').map(x => parseFloat(x
-            .trim()));
-        let se = document.getElementById('offlineMapSE').value.split(',').map(x => parseFloat(x
-            .trim()));
-        if (nw.length !== 2 || se.length !== 2 || isNaN(nw[0]) || isNaN(se[0])) {
-            alert('LatLng belum valid!');
-            return;
-        }
-        if (offlineImageLayer) map.removeLayer(offlineImageLayer);
         if (img.type === "application/pdf") {
-            renderPDFasOverlay(e.target.result, nw, se);
+            // Coba ekstrak georeference otomatis dari PDF
+            extractGeoReferenceFromPDF(e.target.result).then(geoRef => {
+                if (geoRef && geoRef.bounds) {
+                    // Disable input manual jika georeference ditemukan
+                    document.getElementById('offlineMapNW').disabled = true;
+                    document.getElementById('offlineMapSE').disabled = true;
+                    // Ambil NW (maxY, minX) dan SE (minY, maxX)
+                    let minX = geoRef.bounds[0];
+                    let minY = geoRef.bounds[1];
+                    let maxX = geoRef.bounds[2];
+                    let maxY = geoRef.bounds[3];
+                    let nw = [maxY, minX];
+                    let se = [minY, maxX];
+                    updateTrackingStatus("GeoPDF terdeteksi, georeference otomatis diterapkan.");
+                    renderPDFasOverlay(e.target.result, nw, se);
+                } else {
+                    // Enable input manual jika tidak ditemukan
+                    document.getElementById('offlineMapNW').disabled = false;
+                    document.getElementById('offlineMapSE').disabled = false;
+                    updateTrackingStatus("GeoPDF tidak ditemukan, silakan input manual.");
+                    let nw = document.getElementById('offlineMapNW').value.split(',').map(x => parseFloat(x.trim()));
+                    let se = document.getElementById('offlineMapSE').value.split(',').map(x => parseFloat(x.trim()));
+                    renderPDFasOverlay(e.target.result, nw, se);
+                }
+            });
         } else {
+            // File image: PNG/JPG, tetap input manual
+            let nw = document.getElementById('offlineMapNW').value.split(',').map(x => parseFloat(x.trim()));
+            let se = document.getElementById('offlineMapSE').value.split(',').map(x => parseFloat(x.trim()));
+            if (nw.length !== 2 || se.length !== 2 || isNaN(nw[0]) || isNaN(se[0])) {
+                alert('LatLng belum valid!');
+                return;
+            }
+            if (offlineImageLayer) map.removeLayer(offlineImageLayer);
             offlineImageLayer = L.imageOverlay(e.target.result, [
                 [nw[0], nw[1]],
                 [se[0], se[1]]
@@ -2926,9 +2949,45 @@ async function renderPDFasOverlay(pdfArrayBuffer, nw, se) {
         console.error(err);
     }
 }
+
+async function extractGeoReferenceFromPDF(arrayBuffer) {
+    if (!window.pdfjsLib) {
+        alert("PDF.js belum dimuat!");
+        return null;
+    }
+    try {
+        const loadingTask = window.pdfjsLib.getDocument({
+            data: arrayBuffer
+        });
+        const pdf = await loadingTask.promise;
+        const page = await pdf.getPage(1);
+
+        // PDF.js tidak expose semua raw dictionary secara langsung,
+        // tetapi kita bisa mengakses annotation yang kadang berisi geo-metadata
+        const annots = await page.getAnnotations();
+        for (let annot of annots) {
+            // Coba cek property measure (beberapa GeoPDF QGIS/ArcGIS letakkan di sini)
+            if (annot && annot.measure && annot.measure.bounds) {
+                // Berhasil menemukan georeference (GeoPDF QGIS/ArcGIS)
+                return {
+                    bounds: annot.measure.bounds, // format: [minX, minY, maxX, maxY]
+                    crs: annot.measure.gcs
+                };
+            }
+        }
+        // Jika tidak ditemukan, null
+        return null;
+    } catch (err) {
+        console.error("Error parsing PDF for georeference:", err);
+        return null;
+    }
+}
+
 document.getElementById('btnRemoveOfflineMap').onclick = function () {
     if (offlineImageLayer) map.removeLayer(offlineImageLayer);
     offlineImageLayer = null;
+    document.getElementById('offlineMapNW').disabled = false;
+    document.getElementById('offlineMapSE').disabled = false;
 };
 
 // ------ Utility tetap ------
