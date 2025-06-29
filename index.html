@@ -10,6 +10,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.min.js"></script>
 </head>
 
 <body>
@@ -121,19 +122,22 @@
         </div>
         <!-- Tambahan: Upload Offline Map Image -->
         <div class="section">
-            <h4>Tambahkan Peta Offline (PNG/JPG hasil Google Maps)</h4>
-            <input type="file" id="offlineMapInput" accept="image/png, image/jpeg">
-            <label for="offlineMapInput" style="font-size:12px;color:gray;">(Gambar harus hasil screenshot Google Maps,
-                georeference manual di bawah)</label>
+            <h4>Tambahkan Peta Offline (PNG/JPG/PDF)</h4>
+            <input type="file" id="offlineMapInput" accept="image/png, image/jpeg,application/pdf">
+            <label for="offlineMapInput" style="font-size:12px;color:gray;"> <br>
+                (Masukan georeference manual di bawah)</label>
             <br>
-            <label>LatLng Kiri-Atas: <input type="text" id="offlineMapNW" value="-2.27,113.90" size="14"></label>
-            <label>LatLng Kanan-Bawah: <input type="text" id="offlineMapSE" value="-2.28,113.93" size="14"></label>
+            <br>
+            <label>Lat,Long Kiri-Atas: <input type="text" id="offlineMapNW" value="0.964518,111.887306"></label>
+            <label>Lat,Long Kanan-Bawah: <input type="text" id="offlineMapSE" value="0.956639,111.891792"></label>
             <button id="btnSetOfflineMap" type="button"
                 style="background-color: hsl(51, 95%, 45%);color:black;">Terapkan Offline
                 Map</button>
             <button id="btnRemoveOfflineMap" type="button" style="background-color: #f44336;color:#ffffff;">Hapus
                 Offline Map</button>
         </div>
+
+        <!-- BAR Storage -->
         <div id="storage-info-section" style="margin-top: 20px;">
             <div style="margin-bottom:6px;font-weight:bold;">Storage Usage</div>
             <div id="storage-bar-wrapper"

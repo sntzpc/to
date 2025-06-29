@@ -1461,6 +1461,44 @@ let trackingData = [];
 let trackingStartTime = null;
 let trackingPauseTime = null;
 let placemarks = JSON.parse(localStorage.getItem("geoPlacemarks") || "[]");
+let userLocationWatchId = null;
+
+function startUserLocationWatcher() {
+    if (!navigator.geolocation) {
+        updateTrackingStatus('Perangkat tidak mendukung GPS!');
+        return;
+    }
+    // Sudah ada watcher? clear dulu
+    if (userLocationWatchId !== null) {
+        navigator.geolocation.clearWatch(userLocationWatchId);
+        userLocationWatchId = null;
+    }
+    userLocationWatchId = navigator.geolocation.watchPosition(
+        pos => {
+            const {
+                latitude,
+                longitude,
+                accuracy
+            } = pos.coords;
+            if (userMarker) {
+                userMarker.setLatLng([latitude, longitude]);
+                // Map akan pan ke posisi user saat pertama kali (bisa diubah sesuai kebutuhan)
+                if (!map._userCentered) {
+                    map.setView([latitude, longitude], map.getZoom());
+                    map._userCentered = true; // custom property, supaya tidak terus auto-pan
+                }
+            }
+            updateTrackingStatus(`Posisi Anda: (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`);
+        },
+        err => {
+            updateTrackingStatus('Gagal ambil posisi: ' + err.message);
+        }, {
+            enableHighAccuracy: true,
+            maximumAge: 5000,
+            timeout: 10000
+        }
+    );
+}
 
 // Inisialisasi MAP & Layer
 function initGeoMap() {
@@ -1487,6 +1525,7 @@ function initGeoMap() {
     }).addTo(map);
     restorePlacemarks();
     renderPlacemarkTable();
+    startUserLocationWatcher();
 }
 
 // TRACKING REAL TIME
@@ -1564,7 +1603,7 @@ function stopTracking() {
     document.getElementById("btnTrackStop").disabled = true;
 
     if (trackingData.length > 1) {
-        let history = JSON.parse(localStorage.getItem("trackingHistory") || "[]");
+        let history = JSON.parse(localStorage.getItem("trackingHistoryTO") || "[]");
         let estate = document.getElementById("estate") ?.value ?.trim() || "-";
         let divisi = document.getElementById("divisi") ?.value ?.trim() || "-";
         let blok = document.getElementById("blok") ?.value ?.trim() || "-";
@@ -1577,7 +1616,7 @@ function stopTracking() {
             points: trackingData,
             blok: namaBlok
         });
-        localStorage.setItem("trackingHistory", JSON.stringify(history));
+        localStorage.setItem("trackingHistoryTO", JSON.stringify(history));
         updateTrackingStatus(
             `Tracking disimpan (${trackingData.length} titik, durasi: ${Math.round((Date.now() - trackingStartTime)/1000)} detik)`
         );
@@ -1788,7 +1827,7 @@ document.getElementById('btnAddPlacemarkMap').onclick = function() {
 // HISTORY TRACKING
 function renderTrackingHistoryTable() {
     const table = document.getElementById("tracking-history-table").getElementsByTagName("tbody")[0];
-    let history = JSON.parse(localStorage.getItem("trackingHistory") || "[]");
+    let history = JSON.parse(localStorage.getItem("trackingHistoryTO") || "[]");
     table.innerHTML = "";
     if (history.length === 0) {
         const row = table.insertRow();
@@ -1813,7 +1852,7 @@ function renderTrackingHistoryTable() {
 }
 
 function showTrackingOnMap(id) {
-    let history = JSON.parse(localStorage.getItem("trackingHistory") || "[]");
+    let history = JSON.parse(localStorage.getItem("trackingHistoryTO") || "[]");
     let item = history.find(h => h.id === id);
     if (!item || !item.points || item.points.length < 1) {
         alert("Data tracking tidak valid!");
@@ -1826,25 +1865,66 @@ function showTrackingOnMap(id) {
     }
 }
 
-// OFFLINE MAP IMAGE (Gambar hasil screenshot Google Maps)
-// Cara pakai: Upload gambar, isi LatLng NW & SE, klik Terapkan
+// OFFLINE MAP
+// Upload gambar, isi Lat-Long NW & SE, klik Terapkan
 document.getElementById('btnSetOfflineMap').onclick = function () {
     const fileInput = document.getElementById('offlineMapInput');
     if (!fileInput.files.length) {
-        alert('Pilih file gambar terlebih dahulu!');
+        alert('Pilih file gambar atau PDF terlebih dahulu!');
         return;
     }
     let img = fileInput.files[0];
     let reader = new FileReader();
     reader.onload = function (e) {
-        let nw = document.getElementById('offlineMapNW').value.split(',').map(x => parseFloat(x.trim()));
-        let se = document.getElementById('offlineMapSE').value.split(',').map(x => parseFloat(x.trim()));
+        let nw = document.getElementById('offlineMapNW').value.split(',').map(x => parseFloat(x
+            .trim()));
+        let se = document.getElementById('offlineMapSE').value.split(',').map(x => parseFloat(x
+            .trim()));
         if (nw.length !== 2 || se.length !== 2 || isNaN(nw[0]) || isNaN(se[0])) {
             alert('LatLng belum valid!');
             return;
         }
         if (offlineImageLayer) map.removeLayer(offlineImageLayer);
-        offlineImageLayer = L.imageOverlay(e.target.result, [
+        if (img.type === "application/pdf") {
+            renderPDFasOverlay(e.target.result, nw, se);
+        } else {
+            offlineImageLayer = L.imageOverlay(e.target.result, [
+                [nw[0], nw[1]],
+                [se[0], se[1]]
+            ]).addTo(map);
+            map.fitBounds([
+                [nw[0], nw[1]],
+                [se[0], se[1]]
+            ]);
+        }
+    };
+    if (img.type === "application/pdf") {
+        reader.readAsArrayBuffer(img);
+    } else {
+        reader.readAsDataURL(img);
+    }
+};
+async function renderPDFasOverlay(pdfArrayBuffer, nw, se) {
+    try {
+        const loadingTask = window.pdfjsLib.getDocument({
+            data: pdfArrayBuffer
+        });
+        const pdf = await loadingTask.promise;
+        const page = await pdf.getPage(1);
+        const viewport = page.getViewport({
+            scale: 1000 / page.view[2]
+        });
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext('2d');
+        await page.render({
+            canvasContext: ctx,
+            viewport: viewport
+        }).promise;
+        const imgDataUrl = canvas.toDataURL("image/png");
+        if (offlineImageLayer) map.removeLayer(offlineImageLayer);
+        offlineImageLayer = L.imageOverlay(imgDataUrl, [
             [nw[0], nw[1]],
             [se[0], se[1]]
         ]).addTo(map);
@@ -1852,9 +1932,11 @@ document.getElementById('btnSetOfflineMap').onclick = function () {
             [nw[0], nw[1]],
             [se[0], se[1]]
         ]);
-    };
-    reader.readAsDataURL(img);
-};
+    } catch (err) {
+        alert("Gagal memuat PDF: " + err);
+        console.error(err);
+    }
+}
 document.getElementById('btnRemoveOfflineMap').onclick = function () {
     if (offlineImageLayer) map.removeLayer(offlineImageLayer);
     offlineImageLayer = null;
@@ -1862,7 +1944,7 @@ document.getElementById('btnRemoveOfflineMap').onclick = function () {
 
 // ------ Utility tetap ------
 function exportTrackingKML(id) {
-    let history = JSON.parse(localStorage.getItem("trackingHistory") || "[]");
+    let history = JSON.parse(localStorage.getItem("trackingHistoryTO") || "[]");
     let item = history.find(h => h.id === id);
     if (!item || !item.points || item.points.length < 2) {
         alert("Data tracking tidak valid!");
@@ -1881,7 +1963,7 @@ function exportTrackingKML(id) {
     let mm = pad2(dt.getMinutes());
     let ss = pad2(dt.getSeconds());
     let namaBlok = (item.blok || "-").replace(/[^a-zA-Z0-9\-]/g, "");
-    let fileName = `${YY}${MM}${DD}${HH}${mm}${ss}_TrackingSP_${namaBlok}.kml`;
+    let fileName = `${YY}${MM}${DD}${HH}${mm}${ss}_TrackingTO_${namaBlok}.kml`;
     let kml = `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
 <Document>
@@ -1910,9 +1992,9 @@ function exportTrackingKML(id) {
 
 function deleteTrackingHistory(id) {
     if (!confirm("Hapus history tracking ini?")) return;
-    let history = JSON.parse(localStorage.getItem("trackingHistory") || "[]");
+    let history = JSON.parse(localStorage.getItem("trackingHistoryTO") || "[]");
     history = history.filter(h => h.id !== id);
-    localStorage.setItem("trackingHistory", JSON.stringify(history));
+    localStorage.setItem("trackingHistoryTO", JSON.stringify(history));
     renderTrackingHistoryTable();
     updateGeoMapTracking([]);
 }
@@ -1938,6 +2020,13 @@ openTab = function (evt, tabName) {
             restorePlacemarks();
             renderPlacemarkTable();
             updateGeoMapTracking(trackingData);
+            startUserLocationWatcher();
         }, 300);
     }
 };
+
+window.addEventListener("beforeunload", function () {
+    if (userLocationWatchId !== null) {
+        navigator.geolocation.clearWatch(userLocationWatchId);
+    }
+});
