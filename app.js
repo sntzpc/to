@@ -1560,34 +1560,57 @@ function disableRotation(){
   mapBearingDeg = 0;
   applyMapRotationToPane();
   teardownDeviceOrientation();
-  setCompassBadge('N'); // indikator ke "N"
+  detachCompassCenterLock();
+  setCompassBadge('N');
 }
 function enableCompassMode(){
   mapRotateMode = 'compass';
-  // iOS memerlukan permission via user gesture (klik kompas sudah user gesture)
+  setCompassBadge('C');
+
+  // Minta izin sensor (iOS) via klik kompas (sudah dianggap user gesture)
   try {
-    if (typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function") {
+    if (typeof DeviceOrientationEvent !== "undefined" &&
+        typeof DeviceOrientationEvent.requestPermission === "function") {
       DeviceOrientationEvent.requestPermission().then(state=>{
-        if (state === 'granted') attachDeviceOrientation();
-        else alert('Akses kompas ditolak.');
+        if (state === 'granted') {
+          attachDeviceOrientation();
+          attachCompassCenterLock();
+          keepUserCenteredCompass();
+        } else {
+          alert('Akses kompas ditolak.');
+        }
       });
     } else {
       attachDeviceOrientation();
+      attachCompassCenterLock();
+      keepUserCenteredCompass();
     }
   } catch(e){ console.warn('Compass permission error:', e); }
+
+  // Pastikan transform-origin di tengah viewport (poros putar)
+  const pane = map.getPanes().mapPane;
+  pane.style.transformOrigin = '50% 50%';
 }
 function attachDeviceOrientation(){
   teardownDeviceOrientation();
   deviceOrientationListener = (evt)=>{
-    const alpha = evt.alpha; // 0..360 derajat terhadap utara magnetik/benar (tergantung device)
+    const alpha = evt.alpha; // 0..360
     if (alpha == null) return;
-    mapBearingDeg = 360 - alpha;
-    applyMapRotationToPane();
-    setCompassBadge('C');
-    // Pusatkan peta di posisi user saat bearing berubah
+
+    // 1) Pastikan pusat tepat di posisi user
     keepUserCenteredCompass();
+
+    // 2) Update bearing & terapkan rotasi
+    mapBearingDeg = 360 - alpha;
+
+    // Terapkan setelah pan selesai (frame berikut) untuk kurangi flicker
+    requestAnimationFrame(applyMapRotationToPane);
   };
-  window.addEventListener('deviceorientation', deviceOrientationListener, {passive:true});
+  window.addEventListener('deviceorientation', deviceOrientationListener, { passive: true });
+
+  // Saat baru attach, langsung pastikan terkunci di tengah
+  keepUserCenteredCompass();
+  requestAnimationFrame(applyMapRotationToPane);
 }
 function teardownDeviceOrientation(){
   if (deviceOrientationListener){
@@ -1598,9 +1621,9 @@ function teardownDeviceOrientation(){
 function enableFreeRotateMode(){
   mapRotateMode = 'free';
   setCompassBadge('F');
-  // Gesture dua jari untuk memutar
   enableTwoFingerRotate();
   teardownDeviceOrientation();
+  detachCompassCenterLock();
 }
 function setCompassBadge(ch){
   const el = document.getElementById('compassBadge');
@@ -1776,14 +1799,42 @@ function ensureLegendToggleControl(){
   btn.title = wantVisible ? 'Sembunyikan legenda' : 'Tampilkan legenda';
 }
 
-// Jaga posisi user tetap di tengah saat mode compass aktif
-function keepUserCenteredCompass(){
-  if (mapRotateMode === 'compass' && lastUserLatLng){
-    // Jangan animasi supaya stabil dan tidak “bergetar”
-    map.setView(lastUserLatLng, map.getZoom(), { animate:false });
+// Koreksi pusat peta ke posisi user secara pixel-perfect (tanpa animasi)
+function centerOnUserPixelSafe(){
+  if (!map || !lastUserLatLng) return;
+  // Titik user pada layar (sebelum rotasi CSS diterapkan)
+  const pUser = map.latLngToContainerPoint(lastUserLatLng);
+  const size  = map.getSize();
+  const cx = size.x / 2, cy = size.y / 2;
+  const dx = cx - pUser.x;
+  const dy = cy - pUser.y;
+  // Hindari jitter: koreksi hanya bila > 0.5 px
+  if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
+    map.panBy([dx, dy], { animate: false });
   }
 }
 
+// Jaga user tetap di tengah saat mode kompas aktif
+function keepUserCenteredCompass(){
+  if (mapRotateMode === 'compass') {
+    centerOnUserPixelSafe();
+  }
+}
+
+/* 2) ADD — handler kunci pusat saat kompas aktif */
+let compassCenterLockHandler = null;
+function attachCompassCenterLock(){
+  if (!map) return;
+  if (!compassCenterLockHandler){
+    compassCenterLockHandler = ()=> keepUserCenteredCompass();
+  }
+  // Lock pada berbagai event agar selalu snap back ke tengah
+  map.on('move moveend zoom zoomend viewreset', compassCenterLockHandler);
+}
+function detachCompassCenterLock(){
+  if (!map || !compassCenterLockHandler) return;
+  map.off('move moveend zoom zoomend viewreset', compassCenterLockHandler);
+}
 
 // ====== Legenda & layer riwayat per sesi ======
 const historyLayersById = Object.create(null);
@@ -1927,7 +1978,7 @@ function startUserLocationWatcher() {
   }
   userLocationWatchId = navigator.geolocation.watchPosition(
     pos => {
-      const { latitude, longitude, accuracy } = pos.coords;
+      const { latitude, longitude } = pos.coords;
       lastUserLatLng = [latitude, longitude];
 
       if (userMarker) {
@@ -1938,7 +1989,7 @@ function startUserLocationWatcher() {
         }
       }
 
-      // Jika sedang compass mode, pastikan selalu di tengah
+      // Kunci user di tengah jika kompas aktif
       keepUserCenteredCompass();
 
       updateTrackingStatus(`Posisi Anda: (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`);
@@ -1969,6 +2020,7 @@ function initGeoMap() {
   startUserLocationWatcher();
 
   ensureCompassControl();
+  keepUserCenteredCompass(); // aman walau belum ada GPS fix
   ensureLegendToggleControl();        // <— tombol Legend selalu dibuat
   setMapRotateMode('static');
 
@@ -1980,88 +2032,99 @@ function initGeoMap() {
 }
 
 // ================== TRACKING REAL TIME (modifikasi: wakelock, akurasi, auto-pause/resume) ==================
-function startTracking(fromRestore=false) {
+function startTracking(fromRestore = false) {
+  // --- Guard & state awal ---
   if (!navigator.geolocation) {
     alert('Perangkat tidak mendukung GPS!');
     return;
   }
   if (trackingActive && !trackingPaused) return;
+
   trackingActive = true;
-  if (trackingPaused) trackingPaused = false;
+  trackingPaused = false;
   trackingAutoPaused = false;
 
   trackingData = trackingData || [];
   if (!fromRestore) trackingStartTime = trackingStartTime || Date.now();
   trackingPauseTime = null;
 
+  // --- UI & housekeeping ---
   document.getElementById("btnTrackStart").disabled = true;
   document.getElementById("btnTrackPause").disabled = false;
   document.getElementById("btnTrackStop").disabled  = false;
   updateTrackingStatus("Perekaman dimulai...");
-
   hideTrackControls();
   saveActiveTrackingSession();
-  requestWakeLock();
+  requestWakeLock(); // aman dipanggil meski tidak didukung (function sudah try/catch)
 
+  // --- GPS watcher utama ---
   trackingWatchId = navigator.geolocation.watchPosition(
-    pos => {
+    (pos) => {
       const { latitude, longitude, accuracy, speed } = pos.coords;
 
-      if (accuracy!=null && accuracy > ACCURACY_THRESHOLD_M) {
+      // 1) Filter akurasi (abaikan titik tidak layak)
+      if (accuracy != null && accuracy > ACCURACY_THRESHOLD_M) {
         updateTrackingStatus(`Akurasi buruk (${Math.round(accuracy)} m) – titik diabaikan`);
+        // Saat kompas aktif, tetap kunci pusat agar poros tidak bergeser
+        if (mapRotateMode === 'compass') keepUserCenteredCompass();
         return;
       }
 
-      // Simpan posisi user terakhir
+      // 2) Update posisi user terakhir (untuk pusat poros kompas)
       lastUserLatLng = [latitude, longitude];
 
-      const now = {lat: latitude, lng: longitude, t: Date.now()};
-      let v = (typeof speed === 'number' && !isNaN(speed)) ? speed : 0;
-      if (!v || v<=0) {
-        if (lastSpeedRef){
-          v = computeSpeedMps(lastSpeedRef, now);
-        }
+      // 3) Hitung kecepatan (prioritaskan sensor native; fallback dari dua titik)
+      const now = { lat: latitude, lng: longitude, t: Date.now() };
+      let vMps = (typeof speed === 'number' && !isNaN(speed)) ? speed : 0;
+      if (!vMps || vMps <= 0) {
+        if (lastSpeedRef) vMps = computeSpeedMps(lastSpeedRef, now);
       }
 
-      if (v < SPEED_PAUSE_THRESH_MPS) {
+      // 4) Auto-pause / Auto-resume
+      if (vMps < SPEED_PAUSE_THRESH_MPS) {
         if (lastSpeedRef) idleAccumMs += (now.t - lastSpeedRef.t);
-        if (!trackingAutoPaused && idleAccumMs >= IDLE_PAUSE_SECS*1000) {
+        if (!trackingAutoPaused && idleAccumMs >= IDLE_PAUSE_SECS * 1000) {
           trackingAutoPaused = true;
           updateTrackingStatus("Tracking Auto-Pause (diam terlalu lama). Bergerak untuk melanjutkan...");
         }
       } else {
         idleAccumMs = 0;
-        if (trackingAutoPaused && v >= RESUME_SPEED_MPS) {
+        if (trackingAutoPaused && vMps >= RESUME_SPEED_MPS) {
           trackingAutoPaused = false;
           updateTrackingStatus("Gerak terdeteksi, tracking dilanjutkan.");
         }
       }
       lastSpeedRef = now;
 
+      // Saat auto-pause: jangan menambah titik tapi tetap jaga poros kompas
       if (trackingAutoPaused) {
-        // Meski tidak mencatat titik, tetap jaga center pada compass
-        keepUserCenteredCompass();
+        if (mapRotateMode === 'compass') keepUserCenteredCompass();
         return;
       }
 
-      // Catat titik & update peta
+      // 5) Tambahkan titik, render polyline, dan posisikan marker
       trackingData.push({ timestamp: now.t, latitude, longitude, accuracy });
       updateGeoMapTracking(trackingData);
       userMarker.setLatLng(lastUserLatLng);
 
-      // Saat compass mode, pusatkan ke user; jika tidak, panTo saat keluar bounds
+      // 6) Pusatkan tampilan:
+      //    - Mode kompas: paksa user tepat di tengah (pivot rotasi)
+      //    - Mode biasa: pan jika di luar bounds
       if (mapRotateMode === 'compass') {
         keepUserCenteredCompass();
       } else if (!map.getBounds().contains(lastUserLatLng)) {
         map.panTo(lastUserLatLng);
       }
 
-      updateTrackingStatus(`Tracking: ${trackingData.length} titik. Lokasi: (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`);
-
-      // Autosave tiap titik
+      // 7) Status + autosave
+      updateTrackingStatus(
+        `Tracking: ${trackingData.length} titik. Lokasi: (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`
+      );
       saveActiveTrackingSession();
     },
-    err => { updateTrackingStatus("Gagal ambil lokasi: " + err.message); },
+    (err) => {
+      updateTrackingStatus("Gagal ambil lokasi: " + err.message);
+    },
     { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
   );
 }
