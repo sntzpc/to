@@ -1490,44 +1490,40 @@
 
         // ================= MAP, TRACKING, PLACEMARK =====================
 
-/** ====== Variabel global utama ====== */
 let map, userMarker, trackingPolyline, placemarksLayer, offlineImageLayer, trackingHistoryLayer;
 let trackingActive = false;
 let trackingPaused = false;
-let trackingAutoPaused = false;       // Auto-pause (watcher tetap jalan)
+let trackingAutoPaused = false;     // Auto-pause (tidak mematikan GPS watcher)
 let trackingWatchId = null;
-let userLocationWatchId = null;
-
 let trackingData = [];
 let trackingStartTime = null;
 let trackingPauseTime = null;
-
 let placemarks = JSON.parse(localStorage.getItem("geoPlacemarks") || "[]");
+let userLocationWatchId = null;
 
-/** ====== Key LocalStorage & default ====== */
-const ACTIVE_SESSION_KEY    = "trackingActiveSessionTO";
-const ACTIVE_SESSION_ID_KEY = "trackingActiveSessionTO_id";
-const HISTORY_KEY           = "trackingHistoryTO";
-const TRACK_COLOR_KEY       = "trackingColorTO";
-const LEGEND_VISIBLE_KEY    = "trackLegendVisibleTO"; // true/false
-const NW_KEY                = "offlineMapNW";
-const SE_KEY                = "offlineMapSE";
-
+// ====== Persisted keys & defaults ======
+const ACTIVE_SESSION_KEY     = "trackingActiveSessionTO";
+const ACTIVE_SESSION_ID_KEY  = "trackingActiveSessionTO_id";
+const HISTORY_KEY            = "trackingHistoryTO";
+const TRACK_COLOR_KEY        = "trackingColorTO";
+const NW_KEY                 = "offlineMapNW";
+const SE_KEY                 = "offlineMapSE";
 let trackingColor = localStorage.getItem(TRACK_COLOR_KEY) || "#ff5500";
-let lastUserLatLng = null; // Posisi user terakhir (untuk pivot kompas)
+const LEGEND_VISIBLE_KEY = "trackLegendVisibleTO";   // simpan status legend (true/false)
+let lastUserLatLng = null;                           // posisi user terakhir (untuk re-center compass)
 
-/** ====== Konfigurasi yang bisa diubah ====== */
-const ACCURACY_THRESHOLD_M   = 50;   // abaikan titik dengan akurasi lebih buruk
-const SPEED_PAUSE_THRESH_MPS = 0.3;  // auto-pause jika < ini ...
-const IDLE_PAUSE_SECS        = 20;   // ... selama detik ini
-const RESUME_SPEED_MPS       = 0.6;  // auto-resume jika >= ini
-const SIMPLIFY_TOLERANCE_M   = 3;    // simplifikasi jalur saat Stop (meter)
+// ====== Konfigurasi (boleh diubah sesuai kebutuhan) ======
+const ACCURACY_THRESHOLD_M   = 50;      // Titik dengan akurasi lebih buruk dari ini diabaikan
+const SPEED_PAUSE_THRESH_MPS = 0.3;     // Auto-pause jika kecepatan di bawah ini...
+const IDLE_PAUSE_SECS        = 20;      // ...selama detik ini
+const RESUME_SPEED_MPS       = 0.6;     // Auto-resume jika kecepatan di atas ini
+const SIMPLIFY_TOLERANCE_M   = 3;       // Simplifikasi jalur saat Stop (toleransi meter)
 
-/** ====== State tambahan kecepatan/statistik ====== */
-let lastSpeedRef = null; // {lat, lng, t}
+// ====== State tambahan untuk Auto-Pause & statistik ======
+let lastSpeedRef = null;     // {lat, lng, t} sebagai referensi hitung kecepatan
 let idleAccumMs  = 0;
 
-/** ====== Wake Lock (layar tetap nyala saat tracking) ====== */
+// ====== Wake Lock (layar tetap nyala saat tracking) ======
 let wakeLock = null;
 async function requestWakeLock(){
   try {
@@ -1545,95 +1541,71 @@ document.addEventListener('visibilitychange', ()=>{
   if (document.visibilityState === 'visible' && trackingActive && !trackingPaused) requestWakeLock();
 });
 
-/** ====== Kompas / Rotasi Peta ====== */
+// ====== Kompas / Rotasi Peta ======
 let mapRotateMode = 'static'; // 'static' | 'compass' | 'free'
 let mapBearingDeg = 0;
 let deviceOrientationListener = null;
-let compassCenterLockHandler = null;
-
 function setMapRotateMode(nextMode){
   if (!map) return;
-  if (nextMode === 'compass')      enableCompassMode();
-  else if (nextMode === 'free')    enableFreeRotateMode();
-  else                             disableRotation();
+  if (nextMode === 'compass') {
+    enableCompassMode();
+  } else if (nextMode === 'free') {
+    enableFreeRotateMode();
+  } else {
+    disableRotation();
+  }
 }
-
 function disableRotation(){
   mapRotateMode = 'static';
   mapBearingDeg = 0;
   applyMapRotationToPane();
   teardownDeviceOrientation();
-  detachCompassCenterLock();
-  setCompassBadge('N');
+  setCompassBadge('N'); // indikator ke "N"
 }
-
 function enableCompassMode(){
   mapRotateMode = 'compass';
-  setCompassBadge('C');
+  // iOS memerlukan permission via user gesture (klik kompas sudah user gesture)
   try {
-    if (typeof DeviceOrientationEvent !== "undefined" &&
-        typeof DeviceOrientationEvent.requestPermission === "function") {
+    if (typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function") {
       DeviceOrientationEvent.requestPermission().then(state=>{
-        if (state === 'granted') {
-          attachDeviceOrientation();
-          attachCompassCenterLock();
-          keepUserCenteredCompass();
-        } else {
-          alert('Akses kompas ditolak.');
-        }
+        if (state === 'granted') attachDeviceOrientation();
+        else alert('Akses kompas ditolak.');
       });
     } else {
       attachDeviceOrientation();
-      attachCompassCenterLock();
-      keepUserCenteredCompass();
     }
   } catch(e){ console.warn('Compass permission error:', e); }
-
-  // Pastikan poros putar di tengah viewport
-  const pane = map.getPanes().mapPane;
-  pane.style.transformOrigin = '50% 50%';
 }
-
 function attachDeviceOrientation(){
   teardownDeviceOrientation();
   deviceOrientationListener = (evt)=>{
-    const alpha = evt.alpha;
+    const alpha = evt.alpha; // 0..360 derajat terhadap utara magnetik/benar (tergantung device)
     if (alpha == null) return;
-
-    // Kunci pusat ke user lebih dulu
-    keepUserCenteredCompass();
-
-    // Update bearing & terapkan rotasi
     mapBearingDeg = 360 - alpha;
-    requestAnimationFrame(applyMapRotationToPane);
+    applyMapRotationToPane();
+    setCompassBadge('C');
+    // Pusatkan peta di posisi user saat bearing berubah
+    keepUserCenteredCompass();
   };
-  window.addEventListener('deviceorientation', deviceOrientationListener, { passive: true });
-
-  // Saat aktif, langsung kunci pusat & rotasi
-  keepUserCenteredCompass();
-  requestAnimationFrame(applyMapRotationToPane);
+  window.addEventListener('deviceorientation', deviceOrientationListener, {passive:true});
 }
-
 function teardownDeviceOrientation(){
   if (deviceOrientationListener){
     window.removeEventListener('deviceorientation', deviceOrientationListener);
     deviceOrientationListener = null;
   }
 }
-
 function enableFreeRotateMode(){
   mapRotateMode = 'free';
   setCompassBadge('F');
+  // Gesture dua jari untuk memutar
   enableTwoFingerRotate();
   teardownDeviceOrientation();
-  detachCompassCenterLock();
 }
-
 function setCompassBadge(ch){
   const el = document.getElementById('compassBadge');
   if (el) el.textContent = ch;
 }
-
 function applyMapRotationToPane(){
   if (!map) return;
   const pane = map.getPanes().mapPane;
@@ -1642,19 +1614,18 @@ function applyMapRotationToPane(){
   const trNoRotate = tr.replace(/ rotate\([^)]+\)/, '');
   pane.style.transform = `${trNoRotate} rotate(${mapBearingDeg}deg)`;
 }
-
 function ensureCompassControl(){
   const container = map.getContainer();
   if (document.getElementById('compassControl')) return;
-
   const ctrl = document.createElement('div');
   ctrl.id = 'compassControl';
   ctrl.style.cssText = `
-    position:absolute; right:12px; top:12px; z-index:1000;
-    width:40px; height:40px; border-radius:20px; background:#fff;
+    position:absolute; right:12px; top:12px; z-index:1000; 
+    width:40px; height:40px; border-radius:20px; background:#fff; 
     box-shadow:0 2px 8px rgba(0,0,0,.25); display:flex; align-items:center; justify-content:center;
     cursor:pointer; user-select:none;
   `;
+  // Icon sederhana
   ctrl.innerHTML = `
     <div style="position:relative; width:26px; height:26px;">
       <div style="position:absolute; left:50%; top:-4px; width:2px; height:34px; background:#e74c3c; transform:translateX(-50%)"></div>
@@ -1668,8 +1639,6 @@ function ensureCompassControl(){
   });
   container.appendChild(ctrl);
 }
-
-/** Rotasi manual dengan dua jari (mode "free") */
 function enableTwoFingerRotate(){
   const pane = map.getContainer();
   let rotating = false, startAngle=0, baseBearing=mapBearingDeg;
@@ -1691,14 +1660,15 @@ function enableTwoFingerRotate(){
   function onMove(e){
     if (!rotating || mapRotateMode!=='free') return;
     if (e.touches && e.touches.length===2){
-      const delta = angleOfTouches(e.touches) - startAngle;
+      const ang = angleOfTouches(e.touches);
+      const delta = ang - startAngle;
       mapBearingDeg = (baseBearing + delta) % 360;
       applyMapRotationToPane();
       e.preventDefault();
     }
   }
   function onEnd(){ rotating=false; }
-
+  // Bind once
   if (!pane._rotBind){
     pane.addEventListener('touchstart', onStart, {passive:false});
     pane.addEventListener('touchmove',  onMove,  {passive:false});
@@ -1707,14 +1677,13 @@ function enableTwoFingerRotate(){
   }
 }
 
-/** ====== Helper umum ====== */
+// ====== Helpers umum ======
 function getCurrentBlokLabel() {
   let estate = document.getElementById("estate")?.value?.trim() || "-";
   let divisi = document.getElementById("divisi")?.value?.trim() || "-";
   let blok   = document.getElementById("blok")?.value?.trim()   || "-";
   return `${estate}${divisi}${blok}`;
 }
-
 function saveActiveTrackingSession() {
   try {
     if (!trackingStartTime || !trackingData || trackingData.length === 0) {
@@ -1734,7 +1703,6 @@ function saveActiveTrackingSession() {
     localStorage.setItem(ACTIVE_SESSION_KEY, JSON.stringify(session));
   } catch(e){ console.warn("[TO] saveActiveTrackingSession error:", e); }
 }
-
 function restoreActiveTrackingSession(resumeWatch=false){
   try {
     const raw = localStorage.getItem(ACTIVE_SESSION_KEY);
@@ -1754,7 +1722,7 @@ function restoreActiveTrackingSession(resumeWatch=false){
     document.getElementById("btnTrackStop").disabled  = true;
 
     trackingActive = true;
-    if (resumeWatch) startTracking(true);
+    if (resumeWatch) startTracking(/*fromRestore*/true);
 
     updateTrackingStatus(`Memulihkan sesi aktif: ${trackingData.length} titik.`);
     return true;
@@ -1764,23 +1732,25 @@ function restoreActiveTrackingSession(resumeWatch=false){
   }
 }
 
-/** ====== Legend: toggle visibility & tombol ====== */
+// === PATCH: Toggle Legend & Compass Centering ===
+
+// Tampilkan/sembunyikan legend + simpan preferensi
 function toggleLegendVisibility(force){
   const lg = document.getElementById('trackLegend');
   if (!lg) return;
-  // target = jika force disediakan → gunakan; jika tidak → toggle
-  const currentlyVisible = lg.style.display !== 'none';
-  const targetVisible = (typeof force === 'boolean') ? force : !currentlyVisible;
-  lg.style.display = targetVisible ? 'block' : 'none';
-  localStorage.setItem(LEGEND_VISIBLE_KEY, String(targetVisible));
-
+  let visible = lg.style.display !== 'none';
+  if (typeof force === 'boolean') visible = !force; // agar bisa dipaksa sesuai argumen
+  lg.style.display = visible ? 'none' : 'block';
+  localStorage.setItem(LEGEND_VISIBLE_KEY, String(!visible));
+  // Update tampilan tombol
   const btn = document.getElementById('legendToggleControl');
   if (btn){
-    btn.dataset.active = targetVisible ? '1' : '0';
-    btn.title = targetVisible ? 'Sembunyikan legenda' : 'Tampilkan legenda';
+    btn.dataset.active = (!visible) ? '1' : '0';
+    btn.title = (!visible) ? 'Sembunyikan legenda' : 'Tampilkan legenda';
   }
 }
 
+// Pastikan tombol toggle legend tersedia
 function ensureLegendToggleControl(){
   if (!map) return;
   const container = map.getContainer();
@@ -1800,44 +1770,23 @@ function ensureLegendToggleControl(){
   btn.addEventListener('click', ()=> toggleLegendVisibility());
   container.appendChild(btn);
 
-  // State awal dari localStorage
+  // Set state awal dari localStorage
   const wantVisible = (localStorage.getItem(LEGEND_VISIBLE_KEY) ?? 'true') !== 'false';
   btn.dataset.active = wantVisible ? '1' : '0';
   btn.title = wantVisible ? 'Sembunyikan legenda' : 'Tampilkan legenda';
 }
 
-/** ====== Pivot kompas: pusatkan user secara pixel-perfect ====== */
-function centerOnUserPixelSafe(){
-  if (!map || !lastUserLatLng) return;
-  const pUser = map.latLngToContainerPoint(lastUserLatLng);
-  const size  = map.getSize();
-  const cx = size.x / 2, cy = size.y / 2;
-  const dx = cx - pUser.x;
-  const dy = cy - pUser.y;
-  if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
-    map.panBy([dx, dy], { animate: false });
-  }
-}
+// Jaga posisi user tetap di tengah saat mode compass aktif
 function keepUserCenteredCompass(){
-  if (mapRotateMode === 'compass') {
-    centerOnUserPixelSafe();
+  if (mapRotateMode === 'compass' && lastUserLatLng){
+    // Jangan animasi supaya stabil dan tidak “bergetar”
+    map.setView(lastUserLatLng, map.getZoom(), { animate:false });
   }
-}
-function attachCompassCenterLock(){
-  if (!map) return;
-  if (!compassCenterLockHandler){
-    compassCenterLockHandler = ()=> keepUserCenteredCompass();
-  }
-  map.on('move moveend zoom zoomend viewreset', compassCenterLockHandler);
-}
-function detachCompassCenterLock(){
-  if (!map || !compassCenterLockHandler) return;
-  map.off('move moveend zoom zoomend viewreset', compassCenterLockHandler);
 }
 
-/** ====== Riwayat tracking: layer & legenda ====== */
+
+// ====== Legenda & layer riwayat per sesi ======
 const historyLayersById = Object.create(null);
-
 function renderTrackingHistoryOnMap(){
   if (!map) return;
   if (!trackingHistoryLayer) trackingHistoryLayer = L.layerGroup().addTo(map);
@@ -1859,7 +1808,6 @@ function renderTrackingHistoryOnMap(){
   });
   renderTrackingLegend();
 }
-
 function renderTrackingLegend(){
   if (!map) return;
   const container = map.getContainer();
@@ -1875,10 +1823,12 @@ function renderTrackingLegend(){
     const title = document.createElement('div');
     title.textContent = 'Legenda Tracing';
     title.style.cssText = 'font-weight:600; margin-bottom:6px; cursor:pointer;';
-    title.addEventListener('click', ()=> toggleLegendVisibility()); // klik judul = toggle
+    // Klik judul juga bisa toggle
+    title.addEventListener('click', ()=> toggleLegendVisibility());
     legend.appendChild(title);
     container.appendChild(legend);
   }
+  // Bersihkan item lama
   legend.querySelectorAll('.legend-row')?.forEach(el=>el.remove());
 
   const history = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
@@ -1904,9 +1854,11 @@ function renderTrackingLegend(){
     legend.appendChild(row);
   });
 
+  // Terapkan visibility dari preferensi
   const wantVisible = (localStorage.getItem(LEGEND_VISIBLE_KEY) ?? 'true') !== 'false';
   legend.style.display = wantVisible ? 'block' : 'none';
 
+  // Pastikan tombol toggle ada & sinkron
   ensureLegendToggleControl();
   const btn = document.getElementById('legendToggleControl');
   if (btn){
@@ -1915,7 +1867,7 @@ function renderTrackingLegend(){
   }
 }
 
-/** ====== Perhitungan jarak/kecepatan ====== */
+// ====== Filter akurasi, Auto-Pause, perhitungan jarak/kecepatan ======
 function haversineMeters(a,b){
   const R=6371000;
   const toRad=x=>x*Math.PI/180;
@@ -1930,10 +1882,10 @@ function computeSpeedMps(prev, now){
   return d/dt;
 }
 
-/** ====== Simplifikasi Douglas–Peucker (meter) ====== */
+// ====== Simplifikasi (Douglas–Peucker) dalam meter ======
 function simplifyPath(points, toleranceM){
   if (!points || points.length<3) return points || [];
-  const toXY = (lat,lng) => ({x: lng*111320, y: lat*110540}); // approx
+  const toXY = (lat,lng) => ({x: lng*111320, y: lat*110540}); // approx meter projection
   const sqr = x=>x*x;
   const dist2 = (p,a,b)=>{
     const A=toXY(a.latitude,a.longitude), B=toXY(b.latitude,b.longitude), P=toXY(p.latitude,p.longitude);
@@ -1963,7 +1915,7 @@ function simplifyPath(points, toleranceM){
   return out.map(i=>points[i]);
 }
 
-/** ====== GPS watcher posisi user (kompas pivot) ====== */
+// ================== GPS user watcher (tetap) ==================
 function startUserLocationWatcher() {
   if (!navigator.geolocation) {
     updateTrackingStatus('Perangkat tidak mendukung GPS!');
@@ -1975,7 +1927,7 @@ function startUserLocationWatcher() {
   }
   userLocationWatchId = navigator.geolocation.watchPosition(
     pos => {
-      const { latitude, longitude } = pos.coords;
+      const { latitude, longitude, accuracy } = pos.coords;
       lastUserLatLng = [latitude, longitude];
 
       if (userMarker) {
@@ -1986,7 +1938,9 @@ function startUserLocationWatcher() {
         }
       }
 
+      // Jika sedang compass mode, pastikan selalu di tengah
       keepUserCenteredCompass();
+
       updateTrackingStatus(`Posisi Anda: (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`);
     },
     err => { updateTrackingStatus('Gagal ambil posisi: ' + err.message); },
@@ -1994,19 +1948,16 @@ function startUserLocationWatcher() {
   );
 }
 
-/** ====== Inisialisasi Map & Layer ====== */
+// ================== Inisialisasi MAP & Layer (modifikasi) ==================
 function initGeoMap() {
   if (map) return;
-
-  map = L.map('geo-map', { zoomControl: true, attributionControl: false })
-        .setView([-2.27, 113.92], 16);
-
+  map = L.map('geo-map', { zoomControl: true, attributionControl: false }).setView([-2.27, 113.92], 16);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
-  placemarksLayer      = L.layerGroup().addTo(map);
+  placemarksLayer = L.layerGroup().addTo(map);
   trackingHistoryLayer = L.layerGroup().addTo(map);
-  trackingPolyline     = L.polyline([], { color: trackingColor, weight: 5 }).addTo(map);
-  userMarker           = L.circleMarker([0, 0], { radius: 8, color: 'red', fillColor: '#f66', fillOpacity: 1 }).addTo(map);
+  trackingPolyline = L.polyline([], { color: trackingColor, weight: 5 }).addTo(map);
+  userMarker = L.circleMarker([0, 0], { radius: 8, color: 'red', fillColor: '#f66', fillOpacity: 1 }).addTo(map);
 
   setupTrackColorPicker();
   loadPersistedNWSE();
@@ -2018,26 +1969,25 @@ function initGeoMap() {
   startUserLocationWatcher();
 
   ensureCompassControl();
-  ensureLegendToggleControl();
-  keepUserCenteredCompass(); // aman walau belum ada GPS fix
+  ensureLegendToggleControl();        // <— tombol Legend selalu dibuat
   setMapRotateMode('static');
 
+  // Pulihkan sesi aktif bila user refresh
   restoreActiveTrackingSession(true);
 
-  // Re-apply rotasi setiap map bergerak/zoom
+  // Re-apply rotasi setiap map bergerak
   map.on('move zoom viewreset moveend zoomend', applyMapRotationToPane);
 }
 
-/** ====== Tracking realtime: wake lock, filter akurasi, auto-pause ====== */
-function startTracking(fromRestore = false) {
+// ================== TRACKING REAL TIME (modifikasi: wakelock, akurasi, auto-pause/resume) ==================
+function startTracking(fromRestore=false) {
   if (!navigator.geolocation) {
     alert('Perangkat tidak mendukung GPS!');
     return;
   }
   if (trackingActive && !trackingPaused) return;
-
   trackingActive = true;
-  trackingPaused = false;
+  if (trackingPaused) trackingPaused = false;
   trackingAutoPaused = false;
 
   trackingData = trackingData || [];
@@ -2048,68 +1998,70 @@ function startTracking(fromRestore = false) {
   document.getElementById("btnTrackPause").disabled = false;
   document.getElementById("btnTrackStop").disabled  = false;
   updateTrackingStatus("Perekaman dimulai...");
+
   hideTrackControls();
   saveActiveTrackingSession();
   requestWakeLock();
 
   trackingWatchId = navigator.geolocation.watchPosition(
-    (pos) => {
+    pos => {
       const { latitude, longitude, accuracy, speed } = pos.coords;
 
-      // 1) Filter akurasi
-      if (accuracy != null && accuracy > ACCURACY_THRESHOLD_M) {
+      if (accuracy!=null && accuracy > ACCURACY_THRESHOLD_M) {
         updateTrackingStatus(`Akurasi buruk (${Math.round(accuracy)} m) – titik diabaikan`);
-        if (mapRotateMode === 'compass') keepUserCenteredCompass();
         return;
       }
 
-      // 2) Update posisi user
+      // Simpan posisi user terakhir
       lastUserLatLng = [latitude, longitude];
 
-      // 3) Hitung kecepatan
-      const now = { lat: latitude, lng: longitude, t: Date.now() };
-      let vMps = (typeof speed === 'number' && !isNaN(speed)) ? speed : 0;
-      if (!vMps || vMps <= 0) if (lastSpeedRef) vMps = computeSpeedMps(lastSpeedRef, now);
+      const now = {lat: latitude, lng: longitude, t: Date.now()};
+      let v = (typeof speed === 'number' && !isNaN(speed)) ? speed : 0;
+      if (!v || v<=0) {
+        if (lastSpeedRef){
+          v = computeSpeedMps(lastSpeedRef, now);
+        }
+      }
 
-      // 4) Auto-pause / resume
-      if (vMps < SPEED_PAUSE_THRESH_MPS) {
+      if (v < SPEED_PAUSE_THRESH_MPS) {
         if (lastSpeedRef) idleAccumMs += (now.t - lastSpeedRef.t);
-        if (!trackingAutoPaused && idleAccumMs >= IDLE_PAUSE_SECS * 1000) {
+        if (!trackingAutoPaused && idleAccumMs >= IDLE_PAUSE_SECS*1000) {
           trackingAutoPaused = true;
           updateTrackingStatus("Tracking Auto-Pause (diam terlalu lama). Bergerak untuk melanjutkan...");
         }
       } else {
         idleAccumMs = 0;
-        if (trackingAutoPaused && vMps >= RESUME_SPEED_MPS) {
+        if (trackingAutoPaused && v >= RESUME_SPEED_MPS) {
           trackingAutoPaused = false;
           updateTrackingStatus("Gerak terdeteksi, tracking dilanjutkan.");
         }
       }
       lastSpeedRef = now;
 
-      // 5) Saat auto-pause: jangan catat titik, tetap kunci poros
       if (trackingAutoPaused) {
-        if (mapRotateMode === 'compass') keepUserCenteredCompass();
+        // Meski tidak mencatat titik, tetap jaga center pada compass
+        keepUserCenteredCompass();
         return;
       }
 
-      // 6) Tambahkan titik & render
+      // Catat titik & update peta
       trackingData.push({ timestamp: now.t, latitude, longitude, accuracy });
       updateGeoMapTracking(trackingData);
       userMarker.setLatLng(lastUserLatLng);
 
-      // 7) Pusatkan tampilan
+      // Saat compass mode, pusatkan ke user; jika tidak, panTo saat keluar bounds
       if (mapRotateMode === 'compass') {
         keepUserCenteredCompass();
       } else if (!map.getBounds().contains(lastUserLatLng)) {
         map.panTo(lastUserLatLng);
       }
 
-      // 8) Status + autosave
       updateTrackingStatus(`Tracking: ${trackingData.length} titik. Lokasi: (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`);
+
+      // Autosave tiap titik
       saveActiveTrackingSession();
     },
-    (err) => { updateTrackingStatus("Gagal ambil lokasi: " + err.message); },
+    err => { updateTrackingStatus("Gagal ambil lokasi: " + err.message); },
     { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
   );
 }
@@ -2119,9 +2071,12 @@ function pauseTracking(manual=true) {
   trackingPaused = true;
   trackingAutoPaused = false;
 
-  if (manual && trackingWatchId !== null) {
-    navigator.geolocation.clearWatch(trackingWatchId);
-    trackingWatchId = null;
+  if (manual) {
+    // Pause manual: hentikan watcher
+    if (trackingWatchId !== null) {
+      navigator.geolocation.clearWatch(trackingWatchId);
+      trackingWatchId = null;
+    }
   }
   trackingPauseTime = Date.now();
   document.getElementById("btnTrackStart").disabled = false;
@@ -2132,23 +2087,22 @@ function pauseTracking(manual=true) {
 
 function stopTracking() {
   if (!trackingActive) return;
-
   trackingActive = false;
   trackingPaused = false;
   trackingAutoPaused = false;
-
   if (trackingWatchId !== null) {
     navigator.geolocation.clearWatch(trackingWatchId);
     trackingWatchId = null;
   }
   releaseWakeLock();
-
   document.getElementById("btnTrackStart").disabled = false;
   document.getElementById("btnTrackPause").disabled = true;
   document.getElementById("btnTrackStop").disabled  = true;
 
   if (trackingData.length > 1) {
+    // Simplifikasi jalur sebelum simpan
     const simplified = simplifyPath(trackingData, SIMPLIFY_TOLERANCE_M);
+
     let history = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
     let namaBlok = getCurrentBlokLabel();
     history.push({
@@ -2165,6 +2119,7 @@ function stopTracking() {
     updateTrackingStatus("Tidak ada data tracking disimpan.");
   }
 
+  // Hapus sesi aktif & reset polyline aktif
   localStorage.removeItem(ACTIVE_SESSION_KEY);
   localStorage.removeItem(ACTIVE_SESSION_ID_KEY);
   updateGeoMapTracking([]);
@@ -2175,6 +2130,7 @@ function stopTracking() {
 
   renderTrackingHistoryTable();
   renderTrackingHistoryOnMap();
+
   showTrackControls();
 }
 
@@ -2182,7 +2138,7 @@ function updateTrackingStatus(msg) {
   document.getElementById("tracking-status").textContent = msg;
 }
 
-/** ====== Polyline tracking aktif ====== */
+// ================== POLYLINE TRACKING ==================
 function updateGeoMapTracking(dataArr) {
   if (!map || !trackingPolyline) return;
   if (!dataArr || dataArr.length === 0) {
@@ -2196,7 +2152,7 @@ function updateGeoMapTracking(dataArr) {
   if (last) userMarker.setLatLng(last);
 }
 
-/** ====== Placemark: warna & ikon ====== */
+// ================== Utility warna icon placemark (tetap) ==================
 function colorToHex(color) {
   if (color === 'red') return '#ff0000';
   if (color === 'blue') return '#007bff';
@@ -2223,7 +2179,7 @@ function createColoredPlacemarkIcon(color) {
   return L.icon({ iconUrl: url, iconSize: [32, 32], iconAnchor: [16, 32], popupAnchor: [0, -28] });
 }
 
-/** ====== Placemark: add/restore/table ====== */
+// ================== PLACEMARK HANDLING (tetap) ==================
 function addPlacemark(latlng, note, color = 'red') {
   placemarks.push({ lat: latlng.lat, lng: latlng.lng, note: note, color: color });
   localStorage.setItem("geoPlacemarks", JSON.stringify(placemarks));
@@ -2252,6 +2208,7 @@ function renderPlacemarkTable() {
     tr.insertCell(1).textContent = (+p.lat).toFixed(6);
     tr.insertCell(2).textContent = (+p.lng).toFixed(6);
     tr.insertCell(3).textContent = p.note;
+    // Color + visual
     let tdColor = tr.insertCell(4);
     let colorDiv = document.createElement('div');
     colorDiv.style.background = p.color;
@@ -2261,6 +2218,7 @@ function renderPlacemarkTable() {
     colorDiv.style.border = "1px solid #888";
     colorDiv.title = p.color;
     tdColor.appendChild(colorDiv);
+    // Hapus
     let delBtn = document.createElement('button');
     delBtn.textContent = "Hapus";
     delBtn.style.backgroundColor = "#dc3545";
@@ -2276,7 +2234,7 @@ function renderPlacemarkTable() {
   });
 }
 
-/** ====== Export Placemark KML ====== */
+// ================== Export Placemark KML (tetap) ==================
 document.getElementById('exportPlacemarkKML').onclick = function () {
   if (!placemarks.length) return alert("Tidak ada placemark.");
   let kml = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Placemarks TO</name>`;
@@ -2310,7 +2268,7 @@ function colorToKMLHex(c) {
   return map[c] || "ff0000ff";
 }
 
-/** ====== Tambah placemark (UI prompt) ====== */
+// ================== TOMBOL TAMBAH PLACEMARK ==================
 let lastPlacemarkColor = 'red';
 function showPlacemarkPrompt(latlng) {
   let html = `<label>Keterangan: <input id="pmNote" type="text" style="width:140px"></label><br>
@@ -2335,7 +2293,7 @@ function showPlacemarkPrompt(latlng) {
   }, 200);
 }
 
-/** ====== DOM Ready ====== */
+// ================== DOM Ready ==================
 document.addEventListener("DOMContentLoaded", function () {
   setTimeout(() => {
     initGeoMap();
@@ -2343,21 +2301,21 @@ document.addEventListener("DOMContentLoaded", function () {
     renderPlacemarkTable();
   }, 400);
 
+  // State tombol awal
   document.getElementById("btnTrackStart").disabled = false;
   document.getElementById("btnTrackPause").disabled = true;
-  document.getElementById("btnTrackStop").disabled  = true;
+  document.getElementById("btnTrackStop").disabled = true;
 
   loadPersistedNWSE();
   renderTrackingHistoryTable();
   renderTrackingHistoryOnMap();
 });
-
 document.getElementById('btnAddPlacemarkMap').onclick = function () {
   let center = map.getCenter();
   showPlacemarkPrompt(center);
 };
 
-/** ====== History Table + Ekspor GPX/GeoJSON/PDF ====== */
+// ================== HISTORY TRACKING (tambah GPX, GeoJSON, PDF) ==================
 function renderTrackingHistoryTable() {
   const table = document.getElementById("tracking-history-table").getElementsByTagName("tbody")[0];
   let history = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
@@ -2410,6 +2368,7 @@ function showTrackingOnMap(id) {
   }
 }
 
+// ================== Ekspor format tambahan ==================
 function exportTrackingGPX(id){
   const item = (JSON.parse(localStorage.getItem(HISTORY_KEY)||"[]")).find(h=>h.id===id);
   if (!item || !item.points?.length) return alert('Data kosong');
@@ -2446,7 +2405,7 @@ function downloadText(text, filename, mime){
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
 }
 
-/** ====== Statistik + Snapshot + PDF ====== */
+// ================== Statistik + Snapshot + PDF ==================
 function computeSessionStats(points){
   if (!points || points.length<2) return {distanceKm:0, speedAvgKmh:0, speedMaxKmh:0};
   let dist=0, vmax=0;
@@ -2482,10 +2441,12 @@ function exportTrackingPDF(id){
     doc.text(`Durasi  : ${msToTime(item.duration)}`, 40, 112);
     doc.text(`V rata2 : ${stats.speedAvgKmh.toFixed(1)} km/j`, 40, 128);
     doc.text(`V maks  : ${stats.speedMaxKmh.toFixed(1)} km/j`, 40, 144);
+    // Gambar snapshot
     const pageW = doc.internal.pageSize.getWidth();
     doc.addImage(imgData, 'PNG', 40, 170, pageW-80, (pageW-80)*500/800);
     doc.save(`Laporan_TrackingTO_${id}.pdf`);
   } else {
+    // Fallback: unduh PNG snapshot saja
     const a = document.createElement('a');
     a.href = imgData;
     a.download = `Snapshot_TrackingTO_${id}.png`;
@@ -2494,12 +2455,14 @@ function exportTrackingPDF(id){
   }
 }
 
-/** Snapshot jalur (tanpa tile) */
+// Gambar snapshot jalur pada canvas (tanpa tile, aman offline)
 function routeCanvasSnapshot(points, width, height, color){
   const cvs = document.createElement('canvas');
   cvs.width = width; cvs.height = height;
   const ctx = cvs.getContext('2d');
+  // Background
   ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,width,height);
+  // Bounds
   const lats = points.map(p=>p.latitude), lngs = points.map(p=>p.longitude);
   const minLat = Math.min(...lats), maxLat = Math.max(...lats);
   const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
@@ -2509,8 +2472,10 @@ function routeCanvasSnapshot(points, width, height, color){
     const y = pad + ( (maxLat - p.latitude) / (maxLat - minLat || 1) ) * (height - 2*pad);
     return {x,y};
   }
+  // Axis border
   ctx.strokeStyle = '#ddd'; ctx.lineWidth = 1;
   ctx.strokeRect(10,10,width-20,height-20);
+  // Path
   ctx.strokeStyle = color || '#333'; ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.lineCap='round';
   ctx.beginPath();
   points.forEach((p,i)=>{
@@ -2518,13 +2483,14 @@ function routeCanvasSnapshot(points, width, height, color){
     if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
   });
   ctx.stroke();
+  // Start/End dots
   const s = proj(points[0]); const e = proj(points[points.length-1]);
   ctx.fillStyle = '#2ecc71'; ctx.beginPath(); ctx.arc(s.x,s.y,5,0,Math.PI*2); ctx.fill();
   ctx.fillStyle = '#e74c3c'; ctx.beginPath(); ctx.arc(e.x,e.y,5,0,Math.PI*2); ctx.fill();
   return cvs;
 }
 
-/** ====== Offline Map (persist NW/SE + PDF render) ====== */
+// ================== OFFLINE MAP (tetap + persist NW/SE) ==================
 document.getElementById('btnSetOfflineMap').onclick = function () {
   const fileInput = document.getElementById('offlineMapInput');
   if (!fileInput.files.length) {
@@ -2544,7 +2510,10 @@ document.getElementById('btnSetOfflineMap').onclick = function () {
         if (geoRef && geoRef.bounds) {
           document.getElementById('offlineMapNW').disabled = true;
           document.getElementById('offlineMapSE').disabled = true;
-          let [minX, minY, maxX, maxY] = geoRef.bounds;
+          let minX = geoRef.bounds[0];
+          let minY = geoRef.bounds[1];
+          let maxX = geoRef.bounds[2];
+          let maxY = geoRef.bounds[3];
           let nw = [maxY, minX];
           let se = [minY, maxX];
           updateTrackingStatus("GeoPDF terdeteksi, georeference otomatis diterapkan.");
@@ -2573,7 +2542,6 @@ document.getElementById('btnSetOfflineMap').onclick = function () {
   if (img.type === "application/pdf") reader.readAsArrayBuffer(img);
   else reader.readAsDataURL(img);
 };
-
 async function renderPDFasOverlay(pdfArrayBuffer, nw, se) {
   try {
     const loadingTask = window.pdfjsLib.getDocument({ data: pdfArrayBuffer });
@@ -2594,7 +2562,6 @@ async function renderPDFasOverlay(pdfArrayBuffer, nw, se) {
     console.error(err);
   }
 }
-
 async function extractGeoReferenceFromPDF(arrayBuffer) {
   if (!window.pdfjsLib) {
     alert("PDF.js belum dimuat!");
@@ -2616,7 +2583,6 @@ async function extractGeoReferenceFromPDF(arrayBuffer) {
     return null;
   }
 }
-
 document.getElementById('btnRemoveOfflineMap').onclick = function () {
   if (offlineImageLayer) map.removeLayer(offlineImageLayer);
   offlineImageLayer = null;
@@ -2624,7 +2590,7 @@ document.getElementById('btnRemoveOfflineMap').onclick = function () {
   document.getElementById('offlineMapSE').disabled = false;
 };
 
-/** ====== Utility umum ====== */
+// ================== Utility umum ==================
 function exportTrackingKML(id) {
   let history = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
   let item = history.find(h => h.id === id);
@@ -2666,7 +2632,6 @@ function exportTrackingKML(id) {
   a.click();
   document.body.removeChild(a);
 }
-
 function deleteTrackingHistory(id) {
   if (!confirm("Hapus history tracking ini?")) return;
   let history = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
@@ -2676,7 +2641,6 @@ function deleteTrackingHistory(id) {
   renderTrackingHistoryOnMap();
   updateGeoMapTracking([]);
 }
-
 function msToTime(duration) {
   let seconds = Math.floor((duration / 1000) % 60),
       minutes = Math.floor((duration / (1000 * 60)) % 60),
@@ -2684,7 +2648,7 @@ function msToTime(duration) {
   return `${hours > 0 ? hours + "j " : ""}${minutes}m ${seconds}s`;
 }
 
-/** ====== UI helper (warna, NW/SE, pull-to-refresh) ====== */
+// ====== UI helper sebelumnya (warna, NW/SE, pull-to-refresh blocker) ======
 function setupTrackColorPicker(){
   const btnStart = document.getElementById("btnTrackStart");
   let host = btnStart?.parentElement || document.getElementById("tracking-section") || document.getElementById("tracking-status")?.parentElement;
@@ -2710,14 +2674,15 @@ function setupTrackColorPicker(){
       localStorage.setItem(TRACK_COLOR_KEY, trackingColor);
       if (trackingPolyline) trackingPolyline.setStyle({color: trackingColor});
       const raw = localStorage.getItem(ACTIVE_SESSION_KEY);
-      if (raw) { try { const s = JSON.parse(raw); s.color = trackingColor; localStorage.setItem(ACTIVE_SESSION_KEY, JSON.stringify(s)); } catch {} }
+      if (raw) {
+        try { const s = JSON.parse(raw); s.color = trackingColor; localStorage.setItem(ACTIVE_SESSION_KEY, JSON.stringify(s)); } catch {}
+      }
     });
     wrap.appendChild(label); wrap.appendChild(input); host.appendChild(wrap);
   } else {
     document.getElementById("trackColorPicker").value = trackingColor;
   }
 }
-
 function hideTrackControls(){
   const start = document.getElementById("btnTrackStart");
   const pause = document.getElementById("btnTrackPause");
@@ -2749,7 +2714,6 @@ function showTrackControls(){
   const toggle = document.getElementById("trackControlsToggle");
   if (toggle) toggle.style.display = "none";
 }
-
 function loadPersistedNWSE(){
   const inw = document.getElementById("offlineMapNW");
   const ise = document.getElementById("offlineMapSE");
@@ -2760,7 +2724,6 @@ function loadPersistedNWSE(){
   if (inw) inw.addEventListener("change", ()=> localStorage.setItem(NW_KEY, inw.value));
   if (ise) ise.addEventListener("change", ()=> localStorage.setItem(SE_KEY, ise.value));
 }
-
 function setupPullToRefreshBlocker(){
   try{
     document.documentElement.style.overscrollBehaviorY = "contain";
@@ -2782,7 +2745,7 @@ function setupPullToRefreshBlocker(){
   }, {passive:false});
 }
 
-/** ====== Tab integration ====== */
+// ================== Tab integration (tetap + minor) ==================
 const originalOpenTab2 = openTab;
 openTab = function (evt, tabName) {
   originalOpenTab2(evt, tabName);
@@ -2802,7 +2765,7 @@ openTab = function (evt, tabName) {
   }
 };
 
-/** ====== Cleanup saat keluar ====== */
+// ================== Cleanup watcher saat keluar (tetap) ==================
 window.addEventListener("beforeunload", function () {
   if (userLocationWatchId !== null) navigator.geolocation.clearWatch(userLocationWatchId);
   if (trackingWatchId      !== null) navigator.geolocation.clearWatch(trackingWatchId);
