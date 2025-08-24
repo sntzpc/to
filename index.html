@@ -107,47 +107,6 @@
             <p>Total Pokok: <span id="totalPokok">0</span> | No. Terakhir: <span id="lastPokok">-</span></p>
             <p class="timestamp" id="lastSaved">Terakhir disimpan: -</p>
         </div>
-        <!-- Geo-Visualisasi: MAP -->
-        <div id="map-section" style="margin-top:24px;">
-            <h4>Peta Tracking & Placemark</h4>
-            <div id="geo-map"
-                style="height:320px;width:100%;border-radius:8px;border:1px solid #aaa;margin-bottom:12px;">
-                <div id="mapCenterMarker">+</div>
-                </div>
-        </div>
-        <div>
-            <button id="btnAddPlacemarkMap" class="btn btn-warning" type="button">
-                Placemark
-            </button>
-        </div>
-        <!-- Tambahan: Upload Offline Map Image -->
-        <div class="section">
-            <h4>Tambahkan Peta Offline (PNG/JPG/PDF)</h4>
-            <input type="file" id="offlineMapInput" accept="image/png, image/jpeg,application/pdf">
-            <label for="offlineMapInput" style="font-size:12px;color:gray;"> <br>
-                (Masukan georeference manual di bawah)</label>
-            <br>
-            <br>
-            <label>Lat,Long Kiri-Atas: <input type="text" id="offlineMapNW" value="0.964518,111.887306"></label>
-            <label>Lat,Long Kanan-Bawah: <input type="text" id="offlineMapSE" value="0.956639,111.891792"></label>
-            <button id="btnSetOfflineMap" type="button"
-                style="background-color: hsl(51, 95%, 45%);color:black;">Terapkan Offline
-                Map</button>
-            <button id="btnRemoveOfflineMap" type="button" style="background-color: #f44336;color:#ffffff;">Hapus
-                Offline Map</button>
-        </div>
-
-        <!-- BAR Storage -->
-        <div id="storage-info-section" style="margin-top: 20px;">
-            <div style="margin-bottom:6px;font-weight:bold;">Storage Usage</div>
-            <div id="storage-bar-wrapper"
-                style="width:100%;background:#eee;border-radius:8px;height:28px;overflow:hidden;">
-                <div id="storage-bar"
-                    style="height:100%;width:0%;background:#3498db;border-radius:8px 0 0 8px;transition:width 0.4s,background 0.4s;">
-                </div>
-            </div>
-            <div id="storage-info-text" style="margin-top:6px;font-size:14px;text-align:left;"></div>
-        </div>
     </div>
 
     <!-- Tab 2: Verifikasi -->
@@ -494,6 +453,50 @@
             </div>
         </div>
     </div>
+
+    <div class="judul">
+    <!-- Geo-Visualisasi: MAP -->
+        <div id="map-section" style="margin-top:24px;">
+            <h4>Peta Tracking & Placemark</h4>
+            <div id="geo-map"
+                style="height:320px;width:100%;border-radius:8px;border:1px solid #aaa;margin-bottom:12px;">
+                <div id="mapCenterMarker">+</div>
+                </div>
+        </div>
+        <div>
+            <button id="btnAddPlacemarkMap" class="btn btn-warning" type="button">
+                Placemark
+            </button>
+        </div>
+        <!-- Tambahan: Upload Offline Map Image -->
+        <div class="section">
+            <h4>Tambahkan Peta Offline (PNG/JPG/PDF)</h4>
+            <input type="file" id="offlineMapInput" accept="image/png, image/jpeg,application/pdf">
+            <label for="offlineMapInput" style="font-size:12px;color:gray;"> <br>
+                (Masukan georeference manual di bawah)</label>
+            <br>
+            <br>
+            <label>Lat,Long Kiri-Atas: <input type="text" id="offlineMapNW" value="0.964518,111.887306"></label>
+            <label>Lat,Long Kanan-Bawah: <input type="text" id="offlineMapSE" value="0.956639,111.891792"></label>
+            <button id="btnSetOfflineMap" type="button"
+                style="background-color: hsl(51, 95%, 45%);color:black;">Terapkan Offline
+                Map</button>
+            <button id="btnRemoveOfflineMap" type="button" style="background-color: #f44336;color:#ffffff;">Hapus
+                Offline Map</button>
+        </div>
+
+        <!-- BAR Storage -->
+        <div id="storage-info-section" style="margin-top: 20px;">
+            <div style="margin-bottom:6px;font-weight:bold;">Storage Usage</div>
+            <div id="storage-bar-wrapper"
+                style="width:100%;background:#eee;border-radius:8px;height:28px;overflow:hidden;">
+                <div id="storage-bar"
+                    style="height:100%;width:0%;background:#3498db;border-radius:8px 0 0 8px;transition:width 0.4s,background 0.4s;">
+                </div>
+            </div>
+            <div id="storage-info-text" style="margin-top:6px;font-size:14px;text-align:left;"></div>
+        </div>
+        </div>
 </body>
 <script src="app.js"></script>
 
