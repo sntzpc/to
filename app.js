@@ -1509,6 +1509,8 @@ const TRACK_COLOR_KEY        = "trackingColorTO";
 const NW_KEY                 = "offlineMapNW";
 const SE_KEY                 = "offlineMapSE";
 let trackingColor = localStorage.getItem(TRACK_COLOR_KEY) || "#ff5500";
+const LEGEND_VISIBLE_KEY = "trackLegendVisibleTO";   // simpan status legend (true/false)
+let lastUserLatLng = null;                           // posisi user terakhir (untuk re-center compass)
 
 // ====== Konfigurasi (boleh diubah sesuai kebutuhan) ======
 const ACCURACY_THRESHOLD_M   = 50;      // Titik dengan akurasi lebih buruk dari ini diabaikan
@@ -1577,13 +1579,13 @@ function enableCompassMode(){
 function attachDeviceOrientation(){
   teardownDeviceOrientation();
   deviceOrientationListener = (evt)=>{
-    // alpha: derajat terhadap utara (0..360)
-    const alpha = evt.alpha; // bisa null di desktop
+    const alpha = evt.alpha; // 0..360 derajat terhadap utara magnetik/benar (tergantung device)
     if (alpha == null) return;
-    // Sesuaikan orientasi (umumnya 0=Utara; rotasi peta mengikuti alpha)
     mapBearingDeg = 360 - alpha;
     applyMapRotationToPane();
-    setCompassBadge('C'); // compass
+    setCompassBadge('C');
+    // Pusatkan peta di posisi user saat bearing berubah
+    keepUserCenteredCompass();
   };
   window.addEventListener('deviceorientation', deviceOrientationListener, {passive:true});
 }
@@ -1730,6 +1732,59 @@ function restoreActiveTrackingSession(resumeWatch=false){
   }
 }
 
+// === PATCH: Toggle Legend & Compass Centering ===
+
+// Tampilkan/sembunyikan legend + simpan preferensi
+function toggleLegendVisibility(force){
+  const lg = document.getElementById('trackLegend');
+  if (!lg) return;
+  let visible = lg.style.display !== 'none';
+  if (typeof force === 'boolean') visible = !force; // agar bisa dipaksa sesuai argumen
+  lg.style.display = visible ? 'none' : 'block';
+  localStorage.setItem(LEGEND_VISIBLE_KEY, String(!visible));
+  // Update tampilan tombol
+  const btn = document.getElementById('legendToggleControl');
+  if (btn){
+    btn.dataset.active = (!visible) ? '1' : '0';
+    btn.title = (!visible) ? 'Sembunyikan legenda' : 'Tampilkan legenda';
+  }
+}
+
+// Pastikan tombol toggle legend tersedia
+function ensureLegendToggleControl(){
+  if (!map) return;
+  const container = map.getContainer();
+  if (document.getElementById('legendToggleControl')) return;
+
+  const btn = document.createElement('button');
+  btn.id = 'legendToggleControl';
+  btn.type = 'button';
+  btn.textContent = 'Legend';
+  btn.title = 'Tampilkan/Sembunyikan legenda tracing';
+  btn.style.cssText = `
+    position:absolute; left:12px; bottom:12px; z-index:1001;
+    background:#ffffff; color:#333; border:1px solid #ccc; border-radius:20px;
+    padding:6px 12px; font-size:12px; box-shadow:0 2px 8px rgba(0,0,0,.15);
+    cursor:pointer; user-select:none;
+  `;
+  btn.addEventListener('click', ()=> toggleLegendVisibility());
+  container.appendChild(btn);
+
+  // Set state awal dari localStorage
+  const wantVisible = (localStorage.getItem(LEGEND_VISIBLE_KEY) ?? 'true') !== 'false';
+  btn.dataset.active = wantVisible ? '1' : '0';
+  btn.title = wantVisible ? 'Sembunyikan legenda' : 'Tampilkan legenda';
+}
+
+// Jaga posisi user tetap di tengah saat mode compass aktif
+function keepUserCenteredCompass(){
+  if (mapRotateMode === 'compass' && lastUserLatLng){
+    // Jangan animasi supaya stabil dan tidak “bergetar”
+    map.setView(lastUserLatLng, map.getZoom(), { animate:false });
+  }
+}
+
+
 // ====== Legenda & layer riwayat per sesi ======
 const historyLayersById = Object.create(null);
 function renderTrackingHistoryOnMap(){
@@ -1761,18 +1816,21 @@ function renderTrackingLegend(){
     legend = document.createElement('div');
     legend.id = 'trackLegend';
     legend.style.cssText = `
-      position:absolute; left:12px; bottom:12px; max-height:45%; overflow:auto;
+      position:absolute; left:12px; bottom:56px; max-height:45%; overflow:auto;
       z-index:1000; background:#fff; border-radius:10px; padding:8px 10px;
       box-shadow:0 2px 10px rgba(0,0,0,.25); font-size:12px; min-width:190px;
     `;
     const title = document.createElement('div');
     title.textContent = 'Legenda Tracing';
-    title.style.cssText = 'font-weight:600; margin-bottom:6px;';
+    title.style.cssText = 'font-weight:600; margin-bottom:6px; cursor:pointer;';
+    // Klik judul juga bisa toggle
+    title.addEventListener('click', ()=> toggleLegendVisibility());
     legend.appendChild(title);
     container.appendChild(legend);
   }
-  // Isi
+  // Bersihkan item lama
   legend.querySelectorAll('.legend-row')?.forEach(el=>el.remove());
+
   const history = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
   history.slice().reverse().forEach(h=>{
     const row = document.createElement('div');
@@ -1795,6 +1853,18 @@ function renderTrackingLegend(){
     row.appendChild(cb); row.appendChild(sw); row.appendChild(txt);
     legend.appendChild(row);
   });
+
+  // Terapkan visibility dari preferensi
+  const wantVisible = (localStorage.getItem(LEGEND_VISIBLE_KEY) ?? 'true') !== 'false';
+  legend.style.display = wantVisible ? 'block' : 'none';
+
+  // Pastikan tombol toggle ada & sinkron
+  ensureLegendToggleControl();
+  const btn = document.getElementById('legendToggleControl');
+  if (btn){
+    btn.dataset.active = wantVisible ? '1' : '0';
+    btn.title = wantVisible ? 'Sembunyikan legenda' : 'Tampilkan legenda';
+  }
 }
 
 // ====== Filter akurasi, Auto-Pause, perhitungan jarak/kecepatan ======
@@ -1858,13 +1928,19 @@ function startUserLocationWatcher() {
   userLocationWatchId = navigator.geolocation.watchPosition(
     pos => {
       const { latitude, longitude, accuracy } = pos.coords;
+      lastUserLatLng = [latitude, longitude];
+
       if (userMarker) {
-        userMarker.setLatLng([latitude, longitude]);
+        userMarker.setLatLng(lastUserLatLng);
         if (!map._userCentered) {
-          map.setView([latitude, longitude], map.getZoom());
+          map.setView(lastUserLatLng, map.getZoom());
           map._userCentered = true;
         }
       }
+
+      // Jika sedang compass mode, pastikan selalu di tengah
+      keepUserCenteredCompass();
+
       updateTrackingStatus(`Posisi Anda: (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`);
     },
     err => { updateTrackingStatus('Gagal ambil posisi: ' + err.message); },
@@ -1893,6 +1969,7 @@ function initGeoMap() {
   startUserLocationWatcher();
 
   ensureCompassControl();
+  ensureLegendToggleControl();        // <— tombol Legend selalu dibuat
   setMapRotateMode('static');
 
   // Pulihkan sesi aktif bila user refresh
@@ -1930,25 +2007,25 @@ function startTracking(fromRestore=false) {
     pos => {
       const { latitude, longitude, accuracy, speed } = pos.coords;
 
-      // Filter akurasi
       if (accuracy!=null && accuracy > ACCURACY_THRESHOLD_M) {
         updateTrackingStatus(`Akurasi buruk (${Math.round(accuracy)} m) – titik diabaikan`);
         return;
       }
 
+      // Simpan posisi user terakhir
+      lastUserLatLng = [latitude, longitude];
+
       const now = {lat: latitude, lng: longitude, t: Date.now()};
-      // Hitung kecepatan (prioritas dari geolocation.speed; fallback haversine)
       let v = (typeof speed === 'number' && !isNaN(speed)) ? speed : 0;
       if (!v || v<=0) {
         if (lastSpeedRef){
           v = computeSpeedMps(lastSpeedRef, now);
         }
       }
-      // Kelola auto-pause / auto-resume
+
       if (v < SPEED_PAUSE_THRESH_MPS) {
         if (lastSpeedRef) idleAccumMs += (now.t - lastSpeedRef.t);
         if (!trackingAutoPaused && idleAccumMs >= IDLE_PAUSE_SECS*1000) {
-          // Auto-pause: tidak mematikan watcher (agar bisa auto-resume)
           trackingAutoPaused = true;
           updateTrackingStatus("Tracking Auto-Pause (diam terlalu lama). Bergerak untuk melanjutkan...");
         }
@@ -1961,14 +2038,24 @@ function startTracking(fromRestore=false) {
       }
       lastSpeedRef = now;
 
-      // Jika auto-paused, jangan catat titik baru
-      if (trackingAutoPaused) return;
+      if (trackingAutoPaused) {
+        // Meski tidak mencatat titik, tetap jaga center pada compass
+        keepUserCenteredCompass();
+        return;
+      }
 
-      // Catat titik
+      // Catat titik & update peta
       trackingData.push({ timestamp: now.t, latitude, longitude, accuracy });
       updateGeoMapTracking(trackingData);
-      userMarker.setLatLng([latitude, longitude]);
-      if (!map.getBounds().contains([latitude, longitude])) map.panTo([latitude, longitude]);
+      userMarker.setLatLng(lastUserLatLng);
+
+      // Saat compass mode, pusatkan ke user; jika tidak, panTo saat keluar bounds
+      if (mapRotateMode === 'compass') {
+        keepUserCenteredCompass();
+      } else if (!map.getBounds().contains(lastUserLatLng)) {
+        map.panTo(lastUserLatLng);
+      }
+
       updateTrackingStatus(`Tracking: ${trackingData.length} titik. Lokasi: (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`);
 
       // Autosave tiap titik
